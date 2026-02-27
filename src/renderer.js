@@ -75,11 +75,23 @@ export default class Renderer {
     drawSheep(sheep) {
         this.ctx.beginPath();
         this.ctx.arc(sheep.pos.x, sheep.pos.y, sheep.radius, 0, Math.PI * 2);
-        this.ctx.fillStyle = sheep.color;
+        
+        let color = 'white';
+        if (sheep.state === 'flocking') color = '#ffffcc';
+        if (sheep.state === 'spooked') color = '#ffcccc';
+        if (sheep.state === 'penned') color = '#ccffcc';
+        
+        this.ctx.fillStyle = color;
         this.ctx.fill();
         this.ctx.strokeStyle = '#ccc';
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
+
+        if (sheep.state === 'spooked') {
+            this.ctx.font = '10px Arial';
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillText('!', sheep.pos.x, sheep.pos.y - 12);
+        }
     }
 
     drawDog(dog) {

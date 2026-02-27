@@ -107,20 +107,75 @@ export class Sheep extends Entity {
         this.wanderAngle = Math.random() * Math.PI * 2;
     }
 
+export const SheepState = {
+    GRAZING: 'grazing',
+    FLOCKING: 'flocking',
+    SPOOKED: 'spooked',
+    PENNED: 'penned'
+};
+
+export class Sheep extends Entity {
+    constructor(x, y) {
+        super(x, y, 8, 'white');
+        this.maxSpeed = 80;
+        this.maxForce = 5;
+        this.wanderAngle = Math.random() * Math.PI * 2;
+        this.state = SheepState.GRAZING;
+        this.stateTimer = 0;
+        this.panicRadius = 60;
+        this.warnRadius = 150;
+    }
+
     update(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
-        // Behaviors
-        const fleeForce = this.flee(dogs).mul(3.0);
-        const cohesionForce = this.cohesion(others).mul(1.2);
-        const separationForce = this.separation(others).mul(1.8);
-        const alignmentForce = this.alignment(others).mul(1.0);
-        const wanderForce = this.wander().mul(0.3);
+        this.updateState(dogs, pen);
+
+        // Dynamic weights based on state
+        let weights = {
+            flee: 0,
+            cohesion: 0,
+            separation: 1.5,
+            alignment: 0,
+            wander: 0,
+            pen: 0.1,
+            speed: 40
+        };
+
+        switch (this.state) {
+            case SheepState.GRAZING:
+                weights.wander = 0.5;
+                weights.separation = 2.0;
+                weights.speed = 30;
+                break;
+            case SheepState.FLOCKING:
+                weights.cohesion = 1.2;
+                weights.alignment = 1.0;
+                weights.separation = 1.5;
+                weights.flee = 1.5;
+                weights.speed = 70;
+                break;
+            case SheepState.SPOOKED:
+                weights.flee = 4.0;
+                weights.separation = 3.0; // Scatter more when panicked
+                weights.cohesion = 0.5;
+                weights.speed = 140;
+                break;
+            case SheepState.PENNED:
+                weights = { flee: 0, cohesion: 0.5, separation: 1.0, alignment: 0, wander: 0, pen: 0, speed: 10 };
+                break;
+        }
+
+        // Calculate Forces
+        const fleeForce = this.flee(dogs).mul(weights.flee);
+        const cohesionForce = this.cohesion(others).mul(weights.cohesion);
+        const separationForce = this.separation(others).mul(weights.separation);
+        const alignmentForce = this.alignment(others).mul(weights.alignment);
+        const wanderForce = this.wander().mul(weights.wander);
         
-        // Gentle drive towards the pen if they are somewhat near it
         let penForce = new Vector(0, 0);
-        if (pen) {
+        if (pen && this.state !== SheepState.PENNED) {
             const distToPen = this.pos.dist(pen.center);
-            if (distToPen < 300) {
-                penForce = this.seek(pen.center).mul(0.2);
+            if (distToPen < 400) {
+                penForce = this.seek(pen.center).mul(weights.pen);
             }
         }
 
@@ -134,28 +189,58 @@ export class Sheep extends Entity {
         // Obstacle avoidance
         for (const obs of obstacles) {
             const avoid = this.avoidObstacle(obs);
-            this.applyForce(avoid.mul(4.0));
+            this.applyForce(avoid.mul(5.0));
         }
 
-        // Standard update
-        const speedMult = fleeForce.mag() > 0.1 ? 1.5 : 1.0;
-        this.vel = this.vel.add(this.acc.mul(dt)).limit(this.maxSpeed * speedMult);
+        // Apply movement
+        this.vel = this.vel.add(this.acc.mul(dt)).limit(weights.speed);
         this.pos = this.pos.add(this.vel.mul(dt));
         this.acc = this.acc.mul(0);
 
         // Boundary repulsion
-        const margin = 40;
-        if (this.pos.x < margin) this.applyForce(new Vector(this.maxForce, 0));
-        if (this.pos.x > canvasWidth - margin) this.applyForce(new Vector(-this.maxForce, 0));
-        if (this.pos.y < margin) this.applyForce(new Vector(0, this.maxForce));
-        if (this.pos.y > canvasHeight - margin) this.applyForce(new Vector(0, -this.maxForce));
-
-        // Hard boundary
-        this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
-        this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
+        this.boundaries(canvasWidth, canvasHeight);
         
-        // Natural friction/damping
-        this.vel = this.vel.mul(0.98);
+        // Natural friction
+        this.vel = this.vel.mul(this.state === SheepState.PENNED ? 0.8 : 0.97);
+    }
+
+    updateState(dogs, pen) {
+        if (pen.contains(this)) {
+            this.state = SheepState.PENNED;
+            return;
+        }
+
+        let closestDogDist = Infinity;
+        for (const dog of dogs) {
+            const d = this.pos.dist(dog.pos);
+            if (d < closestDogDist) closestDogDist = d;
+        }
+
+        if (closestDogDist < this.panicRadius) {
+            this.state = SheepState.SPOOKED;
+            this.stateTimer = 120; // Panic lasts ~2 seconds
+        } else if (closestDogDist < this.warnRadius) {
+            this.state = SheepState.FLOCKING;
+            this.stateTimer = 60;
+        } else {
+            if (this.stateTimer > 0) {
+                this.stateTimer--;
+            } else {
+                this.state = SheepState.GRAZING;
+            }
+        }
+    }
+
+    boundaries(width, height) {
+        const margin = 40;
+        const force = 5;
+        if (this.pos.x < margin) this.applyForce(new Vector(force, 0));
+        if (this.pos.x > width - margin) this.applyForce(new Vector(-force, 0));
+        if (this.pos.y < margin) this.applyForce(new Vector(0, force));
+        if (this.pos.y > height - margin) this.applyForce(new Vector(0, -force));
+
+        this.pos.x = Math.max(this.radius, Math.min(width - this.radius, this.pos.x));
+        this.pos.y = Math.max(this.radius, Math.min(height - this.radius, this.pos.y));
     }
 
     alignment(others) {
