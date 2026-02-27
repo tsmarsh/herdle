@@ -238,25 +238,32 @@ export default class Renderer {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.ctx.font = 'bold 52px Quicksand, Segoe UI';
+        // Scale font sizes based on canvas width for mobile support
+        const scaleFactor = Math.min(this.canvas.width / 800, 1.2);
+        const titleSize = Math.floor(52 * scaleFactor);
+        const summarySize = Math.floor(22 * scaleFactor);
+        const continueSize = Math.floor(20 * scaleFactor);
+        const spacing = Math.floor(30 * scaleFactor);
+
+        this.ctx.font = `bold ${titleSize}px Quicksand, Segoe UI`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
         this.ctx.shadowBlur = 15;
         this.ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
         this.ctx.fillStyle = '#FFF5D0';
-        this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2 - 30);
+        this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2 - spacing);
 
-        this.ctx.font = '22px Quicksand, Segoe UI';
+        this.ctx.font = `${summarySize}px Quicksand, Segoe UI`;
         this.ctx.shadowBlur = 0;
         let summary = `${penned} penned`;
         if (fallen > 0) summary += `, ${fallen} lost`;
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillText(summary, this.canvas.width / 2, this.canvas.height / 2 + 15);
+        this.ctx.fillText(summary, this.canvas.width / 2, this.canvas.height / 2 + Math.floor(15 * scaleFactor));
 
-        this.ctx.font = '20px Quicksand, Segoe UI';
+        this.ctx.font = `${continueSize}px Quicksand, Segoe UI`;
         this.ctx.fillStyle = 'white';
-        this.ctx.fillText('Click anywhere to continue', this.canvas.width / 2, this.canvas.height / 2 + 50);
+        this.ctx.fillText('Click anywhere to continue', this.canvas.width / 2, this.canvas.height / 2 + Math.floor(50 * scaleFactor));
         this.ctx.restore();
     }
 
