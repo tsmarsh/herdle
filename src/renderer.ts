@@ -1,7 +1,34 @@
 import { Dog, Sheep, Obstacle, Pen, SheepState } from './entities.js';
 
+interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    alpha: number;
+    size: number;
+    fadeSpeed: number;
+}
+
+interface GrassTriangle {
+    x: number;
+    y: number;
+    size: number;
+    shade: string;
+    rotation: number;
+}
+
+interface ObstacleFace {
+    vertices: number[];
+    shade: string;
+}
+
 export default class Renderer {
     private ctx: CanvasRenderingContext2D;
+    private particles: Particle[] = [];
+    private grassTriangles: GrassTriangle[] = [];
+    private obstacleShapes: Map<Obstacle, ObstacleFace[]> = new Map();
+    private initialized = false;
 
     constructor(private canvas: HTMLCanvasElement, private hudItems: Record<string, HTMLElement | null>) {
         const context = canvas.getContext('2d');
@@ -9,27 +36,145 @@ export default class Renderer {
         this.ctx = context;
     }
 
-    clear(): void {
-        this.ctx.fillStyle = '#44a044';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Grass tufts
-        this.ctx.strokeStyle = '#3e903e';
-        this.ctx.lineWidth = 1;
-        for (let i = 0; i < 200; i++) {
-            const x = (i * 123456) % this.canvas.width;
-            const y = (i * 654321) % this.canvas.height;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x - 2, y + 3);
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x + 2, y + 3);
-            this.ctx.stroke();
+    private init(): void {
+        if (this.initialized) return;
+        this.initialized = true;
+
+        // Initialize particles
+        for (let i = 0; i < 40; i++) {
+            this.particles.push(this.createParticle());
+        }
+
+        // Initialize grass triangles
+        this.grassTriangles = [];
+        const greens = ['#7EC8A0', '#A8D8B8', '#C2E6CC', '#8FD4A8', '#B5DFC2'];
+        for (let i = 0; i < 300; i++) {
+            this.grassTriangles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                size: 3 + Math.random() * 8,
+                shade: greens[Math.floor(Math.random() * greens.length)],
+                rotation: Math.random() * Math.PI * 2
+            });
         }
     }
 
+    private createParticle(): Particle {
+        return {
+            x: Math.random() * this.canvas.width,
+            y: Math.random() * this.canvas.height,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: -0.2 - Math.random() * 0.3,
+            alpha: 0.2 + Math.random() * 0.4,
+            size: 1.5 + Math.random() * 2.5,
+            fadeSpeed: 0.001 + Math.random() * 0.002
+        };
+    }
+
+    private getObstacleFaces(obs: Obstacle): ObstacleFace[] {
+        let faces = this.obstacleShapes.get(obs);
+        if (faces) return faces;
+
+        const sides = 6 + Math.floor(Math.random() * 3);
+        const shades = ['#8899AA', '#7788A0', '#99AABB', '#8090A8', '#95A5B5'];
+        const vertices: number[] = [];
+        for (let i = 0; i < sides; i++) {
+            const angle = (i / sides) * Math.PI * 2;
+            const jitter = 0.7 + Math.random() * 0.3;
+            vertices.push(
+                Math.cos(angle) * obs.radius * jitter,
+                Math.sin(angle) * obs.radius * jitter
+            );
+        }
+
+        faces = [];
+        // Each face is a triangle from center to two adjacent vertices
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            faces.push({
+                vertices: [
+                    0, 0,
+                    vertices[i * 2], vertices[i * 2 + 1],
+                    vertices[next * 2], vertices[next * 2 + 1]
+                ],
+                shade: shades[i % shades.length]
+            });
+        }
+
+        this.obstacleShapes.set(obs, faces);
+        return faces;
+    }
+
+    clear(): void {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // Gradient base
+        const grad = this.ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+        grad.addColorStop(0, '#A8D8B8');
+        grad.addColorStop(0.5, '#8CC8A0');
+        grad.addColorStop(1, '#6BAE88');
+        this.ctx.fillStyle = grad;
+        this.ctx.fillRect(0, 0, w, h);
+
+        // Geometric grass triangles
+        for (const tri of this.grassTriangles) {
+            this.ctx.save();
+            this.ctx.translate(tri.x, tri.y);
+            this.ctx.rotate(tri.rotation);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, -tri.size);
+            this.ctx.lineTo(-tri.size * 0.5, tri.size * 0.4);
+            this.ctx.lineTo(tri.size * 0.5, tri.size * 0.4);
+            this.ctx.closePath();
+            this.ctx.fillStyle = tri.shade;
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.fill();
+            this.ctx.globalAlpha = 1;
+            this.ctx.restore();
+        }
+
+        // Soft vignette overlay
+        const vignette = this.ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
+        vignette.addColorStop(0, 'rgba(216, 204, 232, 0)');
+        vignette.addColorStop(1, 'rgba(216, 204, 232, 0.35)');
+        this.ctx.fillStyle = vignette;
+        this.ctx.fillRect(0, 0, w, h);
+    }
+
+    private updateParticles(): void {
+        for (const p of this.particles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.alpha -= p.fadeSpeed;
+
+            if (p.alpha <= 0 || p.y < -10 || p.x < -10 || p.x > this.canvas.width + 10) {
+                Object.assign(p, this.createParticle());
+                p.y = this.canvas.height + 10;
+            }
+        }
+    }
+
+    private drawParticles(): void {
+        this.ctx.save();
+        for (const p of this.particles) {
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(255, 248, 220, ${p.alpha})`;
+            this.ctx.shadowBlur = 8;
+            this.ctx.shadowColor = 'rgba(255, 230, 150, 0.5)';
+            this.ctx.fill();
+        }
+        this.ctx.shadowBlur = 0;
+        this.ctx.restore();
+    }
+
     draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number): void {
+        this.init();
         this.clear();
+
+        this.updateParticles();
+        this.drawParticles();
 
         this.drawPen(pen);
 
@@ -50,38 +195,151 @@ export default class Renderer {
     }
 
     private drawPen(pen: Pen): void {
-        this.ctx.fillStyle = '#6ab06a';
+        // Soft inner glow
+        const innerGlow = this.ctx.createRadialGradient(
+            pen.x + pen.width / 2, pen.y + pen.height / 2, 0,
+            pen.x + pen.width / 2, pen.y + pen.height / 2, pen.width * 0.6
+        );
+        innerGlow.addColorStop(0, 'rgba(255, 255, 240, 0.12)');
+        innerGlow.addColorStop(1, 'rgba(255, 255, 240, 0)');
+        this.ctx.fillStyle = innerGlow;
+        this.ctx.fillRect(pen.x - 20, pen.y - 20, pen.width + 40, pen.height + 40);
+
+        // Ground inside pen
+        this.ctx.fillStyle = 'rgba(194, 230, 204, 0.3)';
         this.ctx.fillRect(pen.x, pen.y, pen.width, pen.height);
-        this.ctx.strokeStyle = '#fff';
-        this.ctx.lineWidth = 4;
-        this.ctx.setLineDash([10, 5]);
-        this.ctx.strokeRect(pen.x, pen.y, pen.width, pen.height);
-        this.ctx.setLineDash([]);
-        
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = 'bold 20px Segoe UI';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('PEN', pen.x + pen.width / 2, pen.y + pen.height / 2 + 8);
+
+        const postWidth = 8;
+        const postHeight = 20;
+        const woodDark = '#A07850';
+        const woodLight = '#C4956A';
+        const woodMid = '#B48860';
+
+        // Draw fence rails along 3 sides (open left side = entrance)
+        // Top rail
+        this.ctx.fillStyle = woodMid;
+        this.ctx.fillRect(pen.x, pen.y - 3, pen.width, 6);
+        this.ctx.fillStyle = woodLight;
+        this.ctx.fillRect(pen.x, pen.y - 3, pen.width, 3);
+
+        // Bottom rail
+        this.ctx.fillStyle = woodMid;
+        this.ctx.fillRect(pen.x, pen.y + pen.height - 3, pen.width, 6);
+        this.ctx.fillStyle = woodLight;
+        this.ctx.fillRect(pen.x, pen.y + pen.height - 3, pen.width, 3);
+
+        // Right rail
+        this.ctx.fillStyle = woodMid;
+        this.ctx.fillRect(pen.x + pen.width - 3, pen.y, 6, pen.height);
+        this.ctx.fillStyle = woodLight;
+        this.ctx.fillRect(pen.x + pen.width - 3, pen.y, 3, pen.height);
+
+        // Fence posts (trapezoids) along 3 sides
+        const postPositions: [number, number][] = [];
+        // Top edge posts
+        for (let t = 0; t <= 1; t += 0.25) {
+            postPositions.push([pen.x + pen.width * t, pen.y]);
+        }
+        // Bottom edge posts
+        for (let t = 0; t <= 1; t += 0.25) {
+            postPositions.push([pen.x + pen.width * t, pen.y + pen.height]);
+        }
+        // Right edge posts
+        for (let t = 0.25; t < 1; t += 0.25) {
+            postPositions.push([pen.x + pen.width, pen.y + pen.height * t]);
+        }
+
+        for (const [px, py] of postPositions) {
+            // Trapezoid post
+            this.ctx.beginPath();
+            this.ctx.moveTo(px - postWidth / 2, py + postHeight / 4);
+            this.ctx.lineTo(px - postWidth / 3, py - postHeight / 2);
+            this.ctx.lineTo(px + postWidth / 3, py - postHeight / 2);
+            this.ctx.lineTo(px + postWidth / 2, py + postHeight / 4);
+            this.ctx.closePath();
+            this.ctx.fillStyle = woodDark;
+            this.ctx.fill();
+
+            // Light face on left side
+            this.ctx.beginPath();
+            this.ctx.moveTo(px - postWidth / 2, py + postHeight / 4);
+            this.ctx.lineTo(px - postWidth / 3, py - postHeight / 2);
+            this.ctx.lineTo(px, py - postHeight / 2);
+            this.ctx.lineTo(px, py + postHeight / 4);
+            this.ctx.closePath();
+            this.ctx.fillStyle = woodLight;
+            this.ctx.fill();
+        }
+
+        // Flag/pennant on the top-right corner post
+        const flagX = pen.x + pen.width;
+        const flagY = pen.y;
+        // Flag pole
+        this.ctx.strokeStyle = woodDark;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(flagX, flagY - postHeight / 2);
+        this.ctx.lineTo(flagX, flagY - postHeight / 2 - 18);
+        this.ctx.stroke();
+        // Pennant triangle
+        this.ctx.beginPath();
+        this.ctx.moveTo(flagX, flagY - postHeight / 2 - 18);
+        this.ctx.lineTo(flagX - 12, flagY - postHeight / 2 - 12);
+        this.ctx.lineTo(flagX, flagY - postHeight / 2 - 8);
+        this.ctx.closePath();
+        this.ctx.fillStyle = '#FFB88A';
+        this.ctx.fill();
     }
 
     private drawObstacle(obs: Obstacle): void {
+        const faces = this.getObstacleFaces(obs);
+
+        // Soft shadow underneath
+        this.ctx.save();
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         this.ctx.beginPath();
-        this.ctx.arc(obs.pos.x, obs.pos.y, obs.radius, 0, Math.PI * 2);
-        this.ctx.fillStyle = '#4a3b2b';
+        this.ctx.ellipse(obs.pos.x, obs.pos.y + obs.radius * 0.3, obs.radius * 1.1, obs.radius * 0.4, 0, 0, Math.PI * 2);
         this.ctx.fill();
-        this.ctx.strokeStyle = '#333';
-        this.ctx.lineWidth = 2;
-        this.ctx.stroke();
+
+        this.ctx.translate(obs.pos.x, obs.pos.y);
+
+        for (const face of faces) {
+            const v = face.vertices;
+            this.ctx.beginPath();
+            this.ctx.moveTo(v[0], v[1]);
+            this.ctx.lineTo(v[2], v[3]);
+            this.ctx.lineTo(v[4], v[5]);
+            this.ctx.closePath();
+            this.ctx.fillStyle = face.shade;
+            this.ctx.fill();
+            this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            this.ctx.lineWidth = 0.5;
+            this.ctx.stroke();
+        }
+
+        this.ctx.restore();
+    }
+
+    private drawPolygon(cx: number, cy: number, radius: number, sides: number, rotation: number = 0): void {
+        this.ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+            const angle = rotation + (i / sides) * Math.PI * 2;
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+            if (i === 0) this.ctx.moveTo(x, y);
+            else this.ctx.lineTo(x, y);
+        }
+        this.ctx.closePath();
     }
 
     private drawSheep(sheep: Sheep): void {
         this.ctx.save();
         this.ctx.translate(sheep.pos.x, sheep.pos.y);
-        
+
         // Shadow
-        this.ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
         this.ctx.beginPath();
-        this.ctx.ellipse(0, 6, sheep.radius * 1.2, sheep.radius * 0.6, 0, 0, Math.PI * 2);
+        this.ctx.ellipse(0, 7, sheep.radius * 1.3, sheep.radius * 0.5, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
         this.ctx.rotate(sheep.angle);
@@ -92,77 +350,99 @@ export default class Renderer {
         const runCycle = isMoving ? Math.sin(sheep.animTime * 3) : 0;
         const bounce = isMoving ? Math.abs(Math.sin(sheep.animTime * 3)) * 3 : breathe;
 
-        // Legs
-        this.ctx.strokeStyle = '#333';
-        this.ctx.lineWidth = 2;
+        // Legs (geometric stubs)
+        this.ctx.fillStyle = '#555';
         const lx = 4;
         const ly = 5;
+        const legOffset = isMoving ? runCycle * 3 : 0;
         // Front legs
-        this.ctx.beginPath();
-        this.ctx.moveTo(lx, -ly); this.ctx.lineTo(lx + (isMoving ? runCycle * 3 : 0), -ly + 2);
-        this.ctx.moveTo(lx, ly); this.ctx.lineTo(lx - (isMoving ? runCycle * 3 : 0), ly + 2);
+        this.ctx.fillRect(lx + legOffset - 1.5, -ly - 1, 3, 5);
+        this.ctx.fillRect(lx - legOffset - 1.5, ly - 1, 3, 5);
         // Back legs
-        this.ctx.moveTo(-lx, -ly); this.ctx.lineTo(-lx - (isMoving ? runCycle * 3 : 0), -ly + 2);
-        this.ctx.moveTo(-lx, ly); this.ctx.lineTo(-lx + (isMoving ? runCycle * 3 : 0), ly + 2);
+        this.ctx.fillRect(-lx - legOffset - 1.5, -ly - 1, 3, 5);
+        this.ctx.fillRect(-lx + legOffset - 1.5, ly - 1, 3, 5);
+
+        // State colors (pastel)
+        let bodyColor = '#F5F0E8';
+        if (sheep.state === SheepState.FLOCKING) bodyColor = '#FFF3CC';
+        if (sheep.state === SheepState.SPOOKED) bodyColor = '#FFB8B8';
+        if (sheep.state === SheepState.PENNED) bodyColor = '#B8F0CC';
+
+        this.ctx.translate(0, -bounce);
+
+        // Penned glow
+        if (sheep.state === SheepState.PENNED) {
+            this.ctx.save();
+            this.ctx.shadowBlur = 12;
+            this.ctx.shadowColor = 'rgba(184, 240, 204, 0.6)';
+            this.drawPolygon(0, 0, sheep.radius + 3, 8);
+            this.ctx.fillStyle = 'rgba(184, 240, 204, 0.15)';
+            this.ctx.fill();
+            this.ctx.restore();
+        }
+
+        // Wool body: overlapping hexagons
+        const r = sheep.radius + 1;
+        this.ctx.fillStyle = bodyColor;
+        // Central hexagon
+        this.drawPolygon(0, 0, r * 1.0, 6, Math.PI / 6);
+        this.ctx.fill();
+        this.ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+        this.ctx.lineWidth = 0.5;
         this.ctx.stroke();
 
-        // Wool "Cloud" Body
-        let bodyColor = 'white';
-        if (sheep.state === SheepState.FLOCKING) bodyColor = '#ffffcc';
-        if (sheep.state === SheepState.SPOOKED) bodyColor = '#ffcccc';
-        if (sheep.state === SheepState.PENNED) bodyColor = '#ccffcc';
+        // Surrounding wool puffs (pentagons)
+        const puffPositions = [
+            [-r * 0.5, -r * 0.35], [-r * 0.5, r * 0.35],
+            [r * 0.35, -r * 0.35], [r * 0.35, r * 0.35],
+            [-r * 0.6, 0]
+        ];
+        for (const [px, py] of puffPositions) {
+            this.drawPolygon(px, py, r * 0.55, 5, Math.PI / 5);
+            this.ctx.fill();
+            this.ctx.stroke();
+        }
 
-        this.ctx.fillStyle = bodyColor;
-        this.ctx.translate(0, -bounce); // Apply bounce to body only
-
-        // Draw multiple overlapping circles for fluffiness
-        const r = sheep.radius + 1;
-        this.drawFluff(0, 0, r * 1.2, r * 0.9);
-        this.drawFluff(-r*0.5, -r*0.3, r*0.6, r*0.6);
-        this.drawFluff(-r*0.5, r*0.3, r*0.6, r*0.6);
-        this.drawFluff(r*0.4, -r*0.3, r*0.6, r*0.6);
-        this.drawFluff(r*0.4, r*0.3, r*0.6, r*0.6);
-
-        // Head
-        this.ctx.fillStyle = '#222';
-        this.ctx.beginPath();
-        this.ctx.ellipse(r * 0.9, 0, 6, 5, 0, 0, Math.PI * 2);
+        // Head (pentagon)
+        this.ctx.fillStyle = '#444';
+        this.drawPolygon(r * 0.9, 0, 5.5, 5);
         this.ctx.fill();
 
-        // Eyes (white dots)
+        // Eyes
         this.ctx.fillStyle = 'white';
         this.ctx.beginPath();
         this.ctx.arc(r * 1.1, -2, 1.5, 0, Math.PI * 2);
         this.ctx.arc(r * 1.1, 2, 1.5, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Ears
-        this.ctx.fillStyle = '#222';
+        // Ears (small triangles)
+        this.ctx.fillStyle = '#444';
         this.ctx.beginPath();
-        this.ctx.ellipse(r * 0.8, -4, 4, 1.5, Math.PI/4, 0, Math.PI * 2);
-        this.ctx.ellipse(r * 0.8, 4, 4, 1.5, -Math.PI/4, 0, Math.PI * 2);
+        this.ctx.moveTo(r * 0.7, -5);
+        this.ctx.lineTo(r * 0.5, -9);
+        this.ctx.lineTo(r * 0.9, -6);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.moveTo(r * 0.7, 5);
+        this.ctx.lineTo(r * 0.5, 9);
+        this.ctx.lineTo(r * 0.9, 6);
+        this.ctx.closePath();
         this.ctx.fill();
 
         this.ctx.restore();
 
+        // Spooked indicator
         if (sheep.state === SheepState.SPOOKED) {
             this.ctx.save();
-            this.ctx.font = 'bold 16px Arial';
-            this.ctx.fillStyle = 'red';
-            this.ctx.shadowBlur = 4;
-            this.ctx.shadowColor = 'black';
+            this.ctx.font = 'bold 14px Segoe UI';
+            this.ctx.fillStyle = '#FF8888';
+            this.ctx.shadowBlur = 6;
+            this.ctx.shadowColor = 'rgba(255, 136, 136, 0.6)';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText('!', sheep.pos.x, sheep.pos.y - 25);
+            this.ctx.fillText('!', sheep.pos.x, sheep.pos.y - 22);
             this.ctx.restore();
         }
-    }
-
-    private drawFluff(x: number, y: number, rw: number, rh: number): void {
-        this.ctx.beginPath();
-        this.ctx.ellipse(x, y, rw, rh, 0, 0, Math.PI * 2);
-        this.ctx.fill();
-        this.ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-        this.ctx.stroke();
     }
 
     private drawDog(dog: Dog): void {
@@ -170,7 +450,7 @@ export default class Renderer {
         this.ctx.translate(dog.pos.x, dog.pos.y);
 
         // Shadow
-        this.ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
         this.ctx.beginPath();
         this.ctx.ellipse(0, 10, dog.radius * 1.3, dog.radius * 0.5, 0, 0, Math.PI * 2);
         this.ctx.fill();
@@ -181,98 +461,176 @@ export default class Renderer {
         const runCycle = isMoving ? Math.sin(dog.animTime * 4) : 0;
         const bounce = isMoving ? Math.abs(Math.sin(dog.animTime * 4)) * 4 : 0;
 
-        // Legs (detailed)
-        this.ctx.strokeStyle = dog.color;
-        this.ctx.lineWidth = 4;
-        this.ctx.lineCap = 'round';
+        // Legs (geometric stubs)
+        this.ctx.fillStyle = dog.color;
         const lx = 8;
         const ly = 6;
-        
-        this.ctx.beginPath();
-        // Dynamic leg positioning for run
-        this.ctx.moveTo(lx, -ly); this.ctx.lineTo(lx + runCycle * 6, -ly);
-        this.ctx.moveTo(lx, ly); this.ctx.lineTo(lx - runCycle * 6, ly);
-        this.ctx.moveTo(-lx, -ly); this.ctx.lineTo(-lx - runCycle * 6, -ly);
-        this.ctx.moveTo(-lx, ly); this.ctx.lineTo(-lx + runCycle * 6, ly);
-        this.ctx.stroke();
+        const legSwing = isMoving ? runCycle * 5 : 0;
+        this.ctx.fillRect(lx + legSwing - 2, -ly - 1.5, 4, 5);
+        this.ctx.fillRect(lx - legSwing - 2, ly - 1.5, 4, 5);
+        this.ctx.fillRect(-lx - legSwing - 2, -ly - 1.5, 4, 5);
+        this.ctx.fillRect(-lx + legSwing - 2, ly - 1.5, 4, 5);
 
         this.ctx.translate(0, -bounce);
 
-        // Body
+        // Body (faceted elongated hexagon)
         this.ctx.fillStyle = dog.color;
         this.ctx.beginPath();
-        this.ctx.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2);
+        this.ctx.moveTo(-16, 0);
+        this.ctx.lineTo(-12, -8);
+        this.ctx.lineTo(6, -9);
+        this.ctx.lineTo(16, -4);
+        this.ctx.lineTo(16, 4);
+        this.ctx.lineTo(6, 9);
+        this.ctx.lineTo(-12, 8);
+        this.ctx.closePath();
         this.ctx.fill();
-        this.ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-        this.ctx.stroke();
+        // Subtle top highlight face
+        this.ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        this.ctx.beginPath();
+        this.ctx.moveTo(-16, 0);
+        this.ctx.lineTo(-12, -8);
+        this.ctx.lineTo(6, -9);
+        this.ctx.lineTo(16, -4);
+        this.ctx.lineTo(16, 0);
+        this.ctx.lineTo(-16, 0);
+        this.ctx.closePath();
+        this.ctx.fill();
 
         // Tail
         this.ctx.beginPath();
         this.ctx.moveTo(-16, 0);
-        this.ctx.quadraticCurveTo(-25, isMoving ? runCycle * 10 : 0, -20, isMoving ? runCycle * 5 : -5);
+        this.ctx.lineTo(-22, isMoving ? runCycle * 8 : -4);
+        this.ctx.lineTo(-19, isMoving ? runCycle * 4 : -6);
         this.ctx.strokeStyle = dog.color;
-        this.ctx.lineWidth = 5;
+        this.ctx.lineWidth = 4;
+        this.ctx.lineCap = 'round';
         this.ctx.stroke();
-        
-        // Head
-        this.ctx.beginPath();
-        this.ctx.ellipse(15, 0, 8, 7, 0, 0, Math.PI * 2);
+
+        // Head (hexagon)
+        this.ctx.fillStyle = dog.color;
+        this.drawPolygon(16, 0, 8, 6);
+        this.ctx.fill();
+        // Head highlight
+        this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        this.drawPolygon(16, 0, 8, 6);
         this.ctx.fill();
 
-        // Muzzle
+        // Muzzle (small pentagon)
+        this.ctx.fillStyle = dog.color;
+        this.drawPolygon(22, 0, 4, 5);
+        this.ctx.fill();
+        this.ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        this.drawPolygon(22, 0, 4, 5);
+        this.ctx.fill();
+
+        // Nose
+        this.ctx.fillStyle = '#555';
         this.ctx.beginPath();
-        this.ctx.ellipse(20, 0, 5, 3, 0, 0, Math.PI * 2);
+        this.ctx.arc(25, 0, 1.5, 0, Math.PI * 2);
         this.ctx.fill();
 
         // Eyes
         this.ctx.fillStyle = 'white';
         this.ctx.beginPath();
-        this.ctx.arc(17, -3, 2, 0, Math.PI * 2);
-        this.ctx.arc(17, 3, 2, 0, Math.PI * 2);
+        this.ctx.arc(18, -3, 2, 0, Math.PI * 2);
+        this.ctx.arc(18, 3, 2, 0, Math.PI * 2);
         this.ctx.fill();
-        this.ctx.fillStyle = 'black';
+        this.ctx.fillStyle = '#333';
         this.ctx.beginPath();
-        this.ctx.arc(18, -3, 1, 0, Math.PI * 2);
-        this.ctx.arc(18, 3, 1, 0, Math.PI * 2);
+        this.ctx.arc(19, -3, 1, 0, Math.PI * 2);
+        this.ctx.arc(19, 3, 1, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Ears (floppy)
-        this.ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        // Ears (triangles)
+        this.ctx.fillStyle = 'rgba(0,0,0,0.2)';
         this.ctx.beginPath();
-        this.ctx.ellipse(12, -6, 5, 3, Math.PI/3, 0, Math.PI * 2);
-        this.ctx.ellipse(12, 6, 5, 3, -Math.PI/3, 0, Math.PI * 2);
+        this.ctx.moveTo(13, -6);
+        this.ctx.lineTo(9, -12);
+        this.ctx.lineTo(16, -8);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.moveTo(13, 6);
+        this.ctx.lineTo(9, 12);
+        this.ctx.lineTo(16, 8);
+        this.ctx.closePath();
         this.ctx.fill();
 
         this.ctx.restore();
 
-        // Selection
+        // Selection glow
         if (dog.selected) {
+            this.ctx.save();
             this.ctx.beginPath();
             this.ctx.arc(dog.pos.x, dog.pos.y, dog.radius + 12, 0, Math.PI * 2);
-            this.ctx.strokeStyle = 'white';
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
             this.ctx.lineWidth = 2;
-            this.ctx.setLineDash([5, 5]);
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
             this.ctx.stroke();
-            this.ctx.setLineDash([]);
+            this.ctx.restore();
         }
 
+        // Name label with soft glow
+        this.ctx.save();
         this.ctx.font = 'bold 12px Segoe UI';
         this.ctx.textAlign = 'center';
         this.ctx.fillStyle = 'white';
+        this.ctx.shadowBlur = 4;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.ctx.fillText(dog.name, dog.pos.x, dog.pos.y - 25);
+        this.ctx.restore();
     }
 
     private drawScore(score: number, total: number): void {
-        this.ctx.font = 'bold 24px Segoe UI';
+        this.ctx.save();
+        this.ctx.font = 'bold 22px Segoe UI';
         this.ctx.textAlign = 'right';
-        this.ctx.fillStyle = 'white';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.shadowBlur = 6;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
         this.ctx.fillText(`Herd Status: ${score}/${total}`, this.canvas.width - 20, 40);
-        
+        this.ctx.restore();
+
         if (score === total) {
-            this.ctx.font = 'bold 48px Segoe UI';
+            this.ctx.save();
+            // Background dim
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Victory text with bloom
+            this.ctx.font = 'bold 52px Segoe UI';
             this.ctx.textAlign = 'center';
-            this.ctx.fillStyle = 'gold';
+            this.ctx.textBaseline = 'middle';
+
+            // Outer glow layer
+            this.ctx.shadowBlur = 30;
+            this.ctx.shadowColor = 'rgba(255, 215, 100, 0.8)';
+            this.ctx.fillStyle = 'rgba(255, 240, 200, 0.3)';
             this.ctx.fillText('FLOCK HERDED!', this.canvas.width / 2, this.canvas.height / 2);
+
+            // Inner glow layer
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
+            this.ctx.fillStyle = '#FFF5D0';
+            this.ctx.fillText('FLOCK HERDED!', this.canvas.width / 2, this.canvas.height / 2);
+
+            // Burst of extra particles on victory
+            for (let i = 0; i < 3; i++) {
+                const p = this.createParticle();
+                p.x = this.canvas.width / 2 + (Math.random() - 0.5) * 200;
+                p.y = this.canvas.height / 2 + (Math.random() - 0.5) * 100;
+                p.alpha = 0.5 + Math.random() * 0.3;
+                p.size = 2 + Math.random() * 3;
+                this.particles.push(p);
+            }
+            // Cap particles to prevent unbounded growth
+            if (this.particles.length > 100) {
+                this.particles.splice(0, this.particles.length - 100);
+            }
+
+            this.ctx.restore();
         }
     }
 
@@ -286,7 +644,7 @@ export default class Renderer {
                 } else {
                     element.classList.remove('selected');
                 }
-                
+
                 const state = dog.destination ? 'Moving' : 'Idle';
                 element.innerHTML = `${dog.name} (${dog.key.toUpperCase()}) <br/> <small>${state}</small>`;
                 element.style.color = dog.color;

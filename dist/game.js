@@ -26,10 +26,10 @@ class Game {
         };
         this.renderer = new Renderer(this.canvas, hudItems);
         this.dogs = [
-            new Dog('ace', 'Ace', 'a', '#ff4d4d', 50, 50),
-            new Dog('shep', 'Shep', 's', '#4d79ff', 150, 50),
-            new Dog('duke', 'Duke', 'd', '#ffdb4d', 50, 150),
-            new Dog('fido', 'Fido', 'f', '#b34dff', 150, 150)
+            new Dog('ace', 'Ace', 'a', '#FF8A8A', 50, 50),
+            new Dog('shep', 'Shep', 's', '#8AA4FF', 150, 50),
+            new Dog('duke', 'Duke', 'd', '#FFD88A', 50, 150),
+            new Dog('fido', 'Fido', 'f', '#C98AFF', 150, 150)
         ];
         this.setup();
     }
