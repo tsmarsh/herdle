@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herdle: 2D Top-Down Herding Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="hud">
+            <div class="hud-item" id="dog-ace">Ace (A)</div>
+            <div class="hud-item" id="dog-shep">Shep (S)</div>
+            <div class="hud-item" id="dog-duke">Duke (D)</div>
+            <div class="hud-item" id="dog-fido">Fido (F)</div>
+        </div>
+        <div id="controls-hint">Hold A, S, D, F to select dogs. Left Click to set/clear destination.</div>
+    </div>
+    <script type="module" src="src/game.js"></script>
+</body>
+</html>
