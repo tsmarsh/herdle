@@ -435,7 +435,7 @@ export default class Renderer {
         // Spooked indicator
         if (sheep.state === SheepState.SPOOKED) {
             this.ctx.save();
-            this.ctx.font = 'bold 14px Segoe UI';
+            this.ctx.font = 'bold 14px Quicksand, Segoe UI';
             this.ctx.fillStyle = '#FF8888';
             this.ctx.shadowBlur = 6;
             this.ctx.shadowColor = 'rgba(255, 136, 136, 0.6)';
@@ -574,7 +574,7 @@ export default class Renderer {
 
         // Name label with soft glow
         this.ctx.save();
-        this.ctx.font = 'bold 12px Segoe UI';
+        this.ctx.font = 'bold 12px Quicksand, Segoe UI';
         this.ctx.textAlign = 'center';
         this.ctx.fillStyle = 'white';
         this.ctx.shadowBlur = 4;
@@ -585,7 +585,7 @@ export default class Renderer {
 
     private drawScore(score: number, total: number): void {
         this.ctx.save();
-        this.ctx.font = 'bold 22px Segoe UI';
+        this.ctx.font = 'bold 22px Quicksand, Segoe UI';
         this.ctx.textAlign = 'right';
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         this.ctx.shadowBlur = 6;
@@ -600,7 +600,7 @@ export default class Renderer {
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
             // Victory text with bloom
-            this.ctx.font = 'bold 52px Segoe UI';
+            this.ctx.font = 'bold 52px Quicksand, Segoe UI';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
 

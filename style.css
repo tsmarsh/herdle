@@ -2,7 +2,7 @@ body {
     margin: 0;
     padding: 0;
     background-color: #222;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Quicksand', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: white;
     overflow: hidden; /* Prevent scrolling */
 }
