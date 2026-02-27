@@ -88,27 +88,27 @@ export class Dog extends Entity {
         }
     }
     updateDog(dt, obstacles, canvasWidth, canvasHeight) {
-        super.update(dt);
-        const arrivalThreshold = 5 + (1 - this.personality.obedience) * 20;
-        const steerCap = this.maxForce * 2 * this.personality.obedience;
+        const arrivalThreshold = 8 + (1 - this.personality.obedience) * 15;
+        const steerCap = this.maxForce * 4 * this.personality.obedience;
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
             const d = desired.mag();
             if (d < arrivalThreshold) {
                 this.destination = null;
-                this.vel = new Vector(0, 0);
+                this.vel = this.vel.mul(0.3);
             }
             else {
-                const speed = Math.min(this.maxSpeed, d * 5);
+                const speed = Math.min(this.maxSpeed, d * 3);
                 const steer = desired.normalize().mul(speed).sub(this.vel);
                 this.applyForce(steer.limit(steerCap));
                 if (this.personality.distractibility > 0) {
                     this.wanderAngle += (Math.random() - 0.5) * 0.3;
-                    const wanderForce = new Vector(Math.cos(this.wanderAngle), Math.sin(this.wanderAngle)).mul(this.maxForce * this.personality.distractibility * 3);
+                    const wanderForce = new Vector(Math.cos(this.wanderAngle), Math.sin(this.wanderAngle)).mul(this.maxForce * this.personality.distractibility * 0.5);
                     this.applyForce(wanderForce);
                 }
             }
         }
+        super.update(dt);
         for (const obs of obstacles) {
             const dist = this.pos.dist(obs.pos);
             const combinedRadius = this.radius + obs.radius;

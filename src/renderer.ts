@@ -649,5 +649,22 @@ export default class Renderer {
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.ctx.fillText(dog.name, dog.pos.x, dog.pos.y - 25);
         this.ctx.restore();
+
+        // Destination marker
+        if (dog.destination) {
+            const dx = dog.destination.x;
+            const dy = dog.destination.y;
+            const pulse = 4 + Math.sin(Date.now() / 200) * 1.5;
+
+            this.ctx.save();
+            this.ctx.translate(dx, dy);
+            this.ctx.rotate(Math.PI / 4);
+            this.ctx.fillStyle = dog.color;
+            this.ctx.globalAlpha = 0.7;
+            this.ctx.shadowBlur = 6;
+            this.ctx.shadowColor = dog.color;
+            this.ctx.fillRect(-pulse, -pulse, pulse * 2, pulse * 2);
+            this.ctx.restore();
+        }
     }
 }

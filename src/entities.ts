@@ -88,10 +88,8 @@ export class Dog extends Entity {
     }
 
     updateDog(dt: number, obstacles: Obstacle[], canvasWidth: number, canvasHeight: number): void {
-        super.update(dt);
-
-        const arrivalThreshold = 5 + (1 - this.personality.obedience) * 20;
-        const steerCap = this.maxForce * 2 * this.personality.obedience;
+        const arrivalThreshold = 8 + (1 - this.personality.obedience) * 15;
+        const steerCap = this.maxForce * 4 * this.personality.obedience;
 
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
@@ -99,9 +97,9 @@ export class Dog extends Entity {
 
             if (d < arrivalThreshold) {
                 this.destination = null;
-                this.vel = new Vector(0, 0);
+                this.vel = this.vel.mul(0.3);
             } else {
-                const speed = Math.min(this.maxSpeed, d * 5);
+                const speed = Math.min(this.maxSpeed, d * 3);
                 const steer = desired.normalize().mul(speed).sub(this.vel);
                 this.applyForce(steer.limit(steerCap));
 
@@ -110,11 +108,13 @@ export class Dog extends Entity {
                     const wanderForce = new Vector(
                         Math.cos(this.wanderAngle),
                         Math.sin(this.wanderAngle)
-                    ).mul(this.maxForce * this.personality.distractibility * 3);
+                    ).mul(this.maxForce * this.personality.distractibility * 0.5);
                     this.applyForce(wanderForce);
                 }
             }
         }
+
+        super.update(dt);
 
         for (const obs of obstacles) {
             const dist = this.pos.dist(obs.pos);
