@@ -551,11 +551,23 @@ export default class Renderer {
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.ctx.fillText(dog.name, dog.pos.x, dog.pos.y - 25);
         this.ctx.restore();
-        // Destination marker
+        // Destination marker + line
         if (dog.destination) {
             const dx = dog.destination.x;
             const dy = dog.destination.y;
             const pulse = 4 + Math.sin(Date.now() / 200) * 1.5;
+            // Dashed line from dog to destination
+            this.ctx.save();
+            this.ctx.setLineDash([6, 4]);
+            this.ctx.strokeStyle = dog.color;
+            this.ctx.globalAlpha = 0.35;
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(dog.pos.x, dog.pos.y);
+            this.ctx.lineTo(dx, dy);
+            this.ctx.stroke();
+            this.ctx.restore();
+            // Marker diamond
             this.ctx.save();
             this.ctx.translate(dx, dy);
             this.ctx.rotate(Math.PI / 4);

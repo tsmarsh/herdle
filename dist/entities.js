@@ -70,54 +70,80 @@ export class Dog extends Entity {
     destination = null;
     selected = false;
     personality;
-    wanderAngle = Math.random() * Math.PI * 2;
+    heading = 0;
     constructor(id, name, key, color, x, y, personality) {
         super(x, y, 12, color);
         this.id = id;
         this.name = name;
         this.key = key;
         this.personality = personality;
-        this.maxSpeed = 300 * personality.speed;
+        this.maxSpeed = 200 * personality.speed;
     }
     setDestination(x, y) {
-        const target = new Vector(x, y);
-        if (this.destination && this.destination.dist(target) < 20) {
+        if (this.destination) {
             this.destination = null;
         }
         else {
-            this.destination = target;
+            this.destination = new Vector(x, y);
         }
     }
     updateDog(dt, obstacles, canvasWidth, canvasHeight) {
-        const arrivalThreshold = 8 + (1 - this.personality.obedience) * 15;
-        const steerCap = this.maxForce * 4 * this.personality.obedience;
         if (this.destination) {
-            const desired = this.destination.sub(this.pos);
-            const d = desired.mag();
-            if (d < arrivalThreshold) {
+            const toTarget = this.destination.sub(this.pos);
+            const dist = toTarget.mag();
+            if (dist < 8) {
+                // Arrive
                 this.destination = null;
-                this.vel = this.vel.mul(0.3);
+                this.vel = new Vector();
             }
             else {
-                const speed = Math.min(this.maxSpeed, d * 3);
-                const steer = desired.normalize().mul(speed).sub(this.vel);
-                this.applyForce(steer.limit(steerCap));
-                if (this.personality.distractibility > 0) {
-                    this.wanderAngle += (Math.random() - 0.5) * 0.3;
-                    const wanderForce = new Vector(Math.cos(this.wanderAngle), Math.sin(this.wanderAngle)).mul(this.maxForce * this.personality.distractibility * 0.5);
-                    this.applyForce(wanderForce);
+                // Turn toward destination
+                const targetAngle = Math.atan2(toTarget.y, toTarget.x);
+                let diff = targetAngle - this.heading;
+                // Normalize to [-PI, PI]
+                while (diff > Math.PI)
+                    diff -= Math.PI * 2;
+                while (diff < -Math.PI)
+                    diff += Math.PI * 2;
+                // Turn rate: obedient dogs turn faster
+                const turnRate = (3 + this.personality.obedience * 5) * dt;
+                // Distractibility adds wobble to heading
+                const wobble = (Math.random() - 0.5) * this.personality.distractibility * 1.5 * dt;
+                if (Math.abs(diff) < turnRate) {
+                    this.heading = targetAngle;
                 }
+                else {
+                    this.heading += Math.sign(diff) * turnRate;
+                }
+                this.heading += wobble;
+                // Move forward along heading at constant speed, slow near target
+                const speed = dist < 30 ? this.maxSpeed * (dist / 30) : this.maxSpeed;
+                this.vel = new Vector(Math.cos(this.heading), Math.sin(this.heading)).mul(speed);
+                this.pos = this.pos.add(this.vel.mul(dt));
             }
         }
-        super.update(dt);
+        else {
+            this.vel = this.vel.mul(0.85); // Friction when idle
+            this.pos = this.pos.add(this.vel.mul(dt));
+        }
+        // Update angle and animation from velocity
+        if (this.vel.mag() > 5) {
+            this.angle = Math.atan2(this.vel.y, this.vel.x);
+            this.animTime += dt * (this.vel.mag() / 20);
+        }
+        else {
+            this.animTime = 0;
+        }
+        // Slide around obstacles
         for (const obs of obstacles) {
             const dist = this.pos.dist(obs.pos);
             const combinedRadius = this.radius + obs.radius;
             if (dist < combinedRadius) {
-                const diff = this.pos.sub(obs.pos).normalize().mul(combinedRadius);
-                this.pos = obs.pos.add(diff);
+                const push = this.pos.sub(obs.pos).normalize().mul(combinedRadius);
+                this.pos = obs.pos.add(push);
             }
         }
+        // Canvas bounds
         this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
         this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
     }
