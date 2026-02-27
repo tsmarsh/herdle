@@ -80,10 +80,11 @@ export class Dog extends Entity {
     }
 
     setDestination(x: number, y: number): void {
-        if (this.destination) {
+        const target = new Vector(x, y);
+        if (this.destination && this.destination.dist(target) < 20) {
             this.destination = null;
         } else {
-            this.destination = new Vector(x, y);
+            this.destination = target;
         }
     }
 

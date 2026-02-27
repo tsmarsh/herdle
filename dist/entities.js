@@ -80,11 +80,12 @@ export class Dog extends Entity {
         this.maxSpeed = 300 * personality.speed;
     }
     setDestination(x, y) {
-        if (this.destination) {
+        const target = new Vector(x, y);
+        if (this.destination && this.destination.dist(target) < 20) {
             this.destination = null;
         }
         else {
-            this.destination = new Vector(x, y);
+            this.destination = target;
         }
     }
     updateDog(dt, obstacles, canvasWidth, canvasHeight) {
