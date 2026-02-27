@@ -7,7 +7,7 @@ export default class MusicPlayer {
     }
     toggle() {
         if (this.audio.paused) {
-            this.audio.play();
+            this.audio.play().catch(() => { });
         }
         else {
             this.audio.pause();

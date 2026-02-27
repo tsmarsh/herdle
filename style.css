@@ -303,3 +303,103 @@ body {
 #config-apply:hover {
     background: rgba(168, 216, 184, 0.5);
 }
+
+/* Level select overlay */
+#level-select-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 90;
+}
+
+#level-select-overlay.hidden {
+    display: none;
+}
+
+#level-select-modal {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 640px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: white;
+}
+
+#level-select-modal h2 {
+    margin: 0 0 18px;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-align: center;
+}
+
+#level-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.level-card {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    position: relative;
+}
+
+.level-card:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.level-card .level-number {
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.level-card .level-name {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.level-card .level-info {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.level-card .level-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 16px;
+}
+
+.level-card.has-cliffs .level-number {
+    color: #FFB88A;
+}
+
+.level-card.completed {
+    border-color: rgba(168, 216, 184, 0.4);
+}
+
+.level-card.completed .level-number {
+    color: #A8D8B8;
+}

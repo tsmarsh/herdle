@@ -1,4 +1,4 @@
-import { Obstacle, Pen } from './entities.js';
+import { Obstacle, Pen, Cliff } from './entities.js';
 import Vector from './vector.js';
 export const LEVELS = [
     // Level 1: Stackelberg — leader-follower, sheep react to where dog IS
@@ -264,5 +264,119 @@ export const LEVELS = [
                 sheepSpawns: Array.from({ length: 20 }, () => new Vector(w * 0.2 + Math.random() * (w * 0.3), h * 0.3 + Math.random() * (h * 0.4)))
             };
         }
+    },
+    // Level 11: The Precipice — single cliff edge, learn not to spook sheep toward it
+    {
+        name: "Level 11: The Precipice",
+        numSheep: 8,
+        availableDogs: ['a'],
+        setupEnvironment: (w, h) => ({
+            pen: new Pen(w - 250, h / 2 - 100, 200, 200),
+            obstacles: [
+                new Obstacle(w * 0.4, h * 0.3, 40),
+                new Obstacle(w * 0.35, h * 0.7, 35)
+            ],
+            sheepSpawns: Array.from({ length: 8 }, () => new Vector(w * 0.3 + (Math.random() - 0.5) * 120, h * 0.5 + (Math.random() - 0.5) * 120)),
+            cliffs: [
+                new Cliff(40, h / 2, 12, h * 0.7) // left-side cliff edge, tall vertical wall
+            ]
+        })
+    },
+    // Level 12: Narrow Ridge — cliffs on two sides forming a corridor
+    {
+        name: "Level 12: Narrow Ridge",
+        numSheep: 10,
+        availableDogs: ['a', 's'],
+        setupEnvironment: (w, h) => ({
+            pen: new Pen(w - 250, h / 2 - 100, 200, 200),
+            obstacles: [
+                new Obstacle(w * 0.5, h * 0.5, 30)
+            ],
+            sheepSpawns: Array.from({ length: 10 }, () => new Vector(w * 0.2 + (Math.random() - 0.5) * 80, h * 0.5 + (Math.random() - 0.5) * 80)),
+            cliffs: [
+                new Cliff(w * 0.5, h * 0.12, w * 0.6, 14), // top cliff edge
+                new Cliff(w * 0.5, h * 0.88, w * 0.6, 14) // bottom cliff edge
+            ]
+        })
+    },
+    // Level 13: The Switchback — zigzag path with cliffs on outer edges
+    {
+        name: "Level 13: The Switchback",
+        numSheep: 12,
+        availableDogs: ['a', 'd'],
+        setupEnvironment: (w, h) => ({
+            pen: new Pen(w - 250, h / 2 - 100, 200, 200),
+            obstacles: [
+                new Obstacle(w * 0.35, h * 0.35, 25),
+                new Obstacle(w * 0.55, h * 0.65, 25)
+            ],
+            sheepSpawns: Array.from({ length: 12 }, () => new Vector(w * 0.15 + (Math.random() - 0.5) * 60, h * 0.5 + (Math.random() - 0.5) * 100)),
+            cliffs: [
+                // Top-left cliff
+                new Cliff(w * 0.22, h * 0.15, w * 0.35, 14),
+                // Bottom zigzag cliff
+                new Cliff(w * 0.45, h * 0.85, w * 0.35, 14),
+                // Middle-right cliff creating the switchback turn
+                new Cliff(w * 0.65, h * 0.45, 14, h * 0.35)
+            ]
+        })
+    },
+    // Level 14: Island Pen — pen on plateau surrounded by cliffs, one safe approach
+    {
+        name: "Level 14: Island Pen",
+        numSheep: 15,
+        availableDogs: ['a', 's', 'd'],
+        setupEnvironment: (w, h) => {
+            const penX = w * 0.7 - 100;
+            const penY = h * 0.5 - 100;
+            return {
+                pen: new Pen(penX, penY, 200, 200),
+                obstacles: [
+                    new Obstacle(w * 0.3, h * 0.3, 35),
+                    new Obstacle(w * 0.25, h * 0.6, 40),
+                    new Obstacle(w * 0.4, h * 0.75, 30)
+                ],
+                sheepSpawns: Array.from({ length: 15 }, () => new Vector(w * 0.2 + (Math.random() - 0.5) * 100, h * 0.5 + (Math.random() - 0.5) * 200)),
+                cliffs: [
+                    // Cliffs surrounding the pen plateau — gap on the left side for approach
+                    new Cliff(penX + 100, penY - 20, 220, 14), // top edge
+                    new Cliff(penX + 100, penY + 220, 220, 14), // bottom edge
+                    new Cliff(penX + 210, penY + 100, 14, 240), // right edge
+                    // Partial left edges with gap in center for entry
+                    new Cliff(penX - 10, penY + 10, 14, 60), // left-top
+                    new Cliff(penX - 10, penY + 190, 14, 60) // left-bottom
+                ]
+            };
+        }
+    },
+    // Level 15: Cliffhanger — multiple cliff edges creating islands with bridges
+    {
+        name: "Level 15: Cliffhanger",
+        numSheep: 20,
+        availableDogs: ['a', 's', 'd', 'f'],
+        setupEnvironment: (w, h) => ({
+            pen: new Pen(w - 260, h / 2 - 100, 210, 200),
+            obstacles: [
+                new Obstacle(w * 0.15, h * 0.25, 30),
+                new Obstacle(w * 0.15, h * 0.75, 30),
+                new Obstacle(w * 0.5, h * 0.3, 25),
+                new Obstacle(w * 0.5, h * 0.7, 25)
+            ],
+            sheepSpawns: Array.from({ length: 20 }, () => new Vector(w * 0.15 + (Math.random() - 0.5) * 80, h * 0.5 + (Math.random() - 0.5) * 200)),
+            cliffs: [
+                // Left island boundary — top and bottom
+                new Cliff(w * 0.18, h * 0.08, w * 0.28, 14),
+                new Cliff(w * 0.18, h * 0.92, w * 0.28, 14),
+                // First gap/bridge crossing at x≈0.32
+                new Cliff(w * 0.33, h * 0.3, 14, h * 0.2), // upper barrier
+                new Cliff(w * 0.33, h * 0.7, 14, h * 0.2), // lower barrier (gap in center)
+                // Middle zone cliffs
+                new Cliff(w * 0.5, h * 0.12, w * 0.2, 14), // top
+                new Cliff(w * 0.5, h * 0.88, w * 0.2, 14), // bottom
+                // Second bridge crossing at x≈0.62
+                new Cliff(w * 0.63, h * 0.25, 14, h * 0.18), // upper barrier
+                new Cliff(w * 0.63, h * 0.75, 14, h * 0.18) // lower barrier (gap in center)
+            ]
+        })
     }
 ];

@@ -43,6 +43,31 @@ export class Obstacle {
         this.radius = radius;
     }
 }
+export class Cliff {
+    pos; // center of the cliff edge
+    width;
+    height;
+    constructor(x, y, width, height) {
+        this.pos = new Vector(x, y);
+        this.width = width;
+        this.height = height;
+    }
+    /** Closest point on the cliff rectangle to a given point */
+    closestPoint(p) {
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        const cx = Math.max(this.pos.x - halfW, Math.min(this.pos.x + halfW, p.x));
+        const cy = Math.max(this.pos.y - halfH, Math.min(this.pos.y + halfH, p.y));
+        return new Vector(cx, cy);
+    }
+    /** Check if a point is inside the cliff rectangle */
+    contains(p) {
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        return p.x >= this.pos.x - halfW && p.x <= this.pos.x + halfW &&
+            p.y >= this.pos.y - halfH && p.y <= this.pos.y + halfH;
+    }
+}
 export class Pen {
     x;
     y;
@@ -87,7 +112,7 @@ export class Dog extends Entity {
             this.destination = new Vector(x, y);
         }
     }
-    updateDog(dt, obstacles, canvasWidth, canvasHeight) {
+    updateDog(dt, obstacles, canvasWidth, canvasHeight, cliffs = []) {
         if (this.destination) {
             const toTarget = this.destination.sub(this.pos);
             const dist = toTarget.mag();
@@ -143,6 +168,21 @@ export class Dog extends Entity {
                 this.pos = obs.pos.add(push);
             }
         }
+        // Avoid cliffs (dogs are smart, always avoid)
+        for (const cliff of cliffs) {
+            const closest = cliff.closestPoint(this.pos);
+            const dist = this.pos.dist(closest);
+            const avoidDist = 40;
+            if (dist < avoidDist && dist > 0) {
+                const push = this.pos.sub(closest).normalize().mul((avoidDist - dist) * 0.5);
+                this.pos = this.pos.add(push);
+            }
+            else if (dist === 0) {
+                // On top of cliff, push out along velocity reverse or arbitrary direction
+                const escape = this.vel.mag() > 0 ? this.vel.normalize().mul(-20) : new Vector(20, 0);
+                this.pos = this.pos.add(escape);
+            }
+        }
         // Canvas bounds
         this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
         this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
@@ -154,6 +194,7 @@ export var SheepState;
     SheepState["FLOCKING"] = "flocking";
     SheepState["SPOOKED"] = "spooked";
     SheepState["PENNED"] = "penned";
+    SheepState["FALLEN"] = "fallen";
 })(SheepState || (SheepState = {}));
 export class Sheep extends Entity {
     state = SheepState.GRAZING;
@@ -168,7 +209,12 @@ export class Sheep extends Entity {
         this.panicRadius = panicRadius;
         this.warnRadius = warnRadius;
     }
-    updateSheep(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
+    fallenTimer = 0;
+    updateSheep(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight, cliffs = []) {
+        if (this.state === SheepState.FALLEN) {
+            this.fallenTimer -= dt;
+            return;
+        }
         this.updateState(dogs, pen);
         super.update(dt);
         let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 60 };
@@ -210,6 +256,28 @@ export class Sheep extends Entity {
         this.vel = this.vel.add(this.acc.mul(dt)).limit(weights.speed);
         this.pos = this.pos.add(this.vel.mul(dt));
         this.acc = this.acc.mul(0);
+        // Cliff interaction
+        for (const cliff of cliffs) {
+            if (this.state === SheepState.SPOOKED) {
+                // Spooked sheep don't avoid cliffs — check if they've fallen
+                if (cliff.contains(this.pos)) {
+                    this.state = SheepState.FALLEN;
+                    this.fallenTimer = 1.5; // seconds for dust cloud animation
+                    this.vel = new Vector();
+                    return;
+                }
+            }
+            else {
+                // Calm/flocking sheep avoid cliffs like strong obstacles
+                const closest = cliff.closestPoint(this.pos);
+                const dist = this.pos.dist(closest);
+                const avoidDist = 40;
+                if (dist < avoidDist && dist > 0) {
+                    const repel = this.pos.sub(closest).normalize().mul(this.maxForce * 3 * (1 - dist / avoidDist));
+                    this.applyForce(repel);
+                }
+            }
+        }
         this.boundaries(canvasWidth, canvasHeight);
         this.vel = this.vel.mul(this.state === SheepState.PENNED ? 0.8 : 0.97);
     }

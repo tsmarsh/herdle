@@ -136,7 +136,7 @@ export default class Renderer {
         this.ctx.shadowBlur = 0;
         this.ctx.restore();
     }
-    draw(dogs, sheep, obstacles, pen, score, total, levelName, levelComplete) {
+    draw(dogs, sheep, obstacles, pen, score, total, levelName, levelComplete, cliffs = [], fallenCount = 0) {
         this.init();
         this.clear();
         this.updateParticles();
@@ -145,19 +145,27 @@ export default class Renderer {
         for (const obs of obstacles) {
             this.drawObstacle(obs);
         }
+        for (const cliff of cliffs) {
+            this.drawCliff(cliff);
+        }
         for (const s of sheep) {
-            this.drawSheep(s);
+            if (s.state === SheepState.FALLEN) {
+                this.drawFallenSheep(s);
+            }
+            else {
+                this.drawSheep(s);
+            }
         }
         for (const dog of dogs) {
             this.drawDog(dog);
         }
-        this.drawScore(score, total, levelName);
+        this.drawScore(score, total, levelName, fallenCount);
         if (levelComplete) {
-            this.drawLevelComplete();
+            this.drawLevelComplete(score, fallenCount);
         }
         this.updateHUD(dogs);
     }
-    drawLevelComplete() {
+    drawLevelComplete(penned, fallen) {
         this.ctx.save();
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -167,21 +175,30 @@ export default class Renderer {
         this.ctx.shadowBlur = 15;
         this.ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
         this.ctx.fillStyle = '#FFF5D0';
-        this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2 - 20);
-        this.ctx.font = '24px Quicksand, Segoe UI';
-        this.ctx.fillStyle = 'white';
+        this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2 - 30);
+        this.ctx.font = '22px Quicksand, Segoe UI';
         this.ctx.shadowBlur = 0;
-        this.ctx.fillText('Click anywhere to proceed to the next level', this.canvas.width / 2, this.canvas.height / 2 + 30);
+        let summary = `${penned} penned`;
+        if (fallen > 0)
+            summary += `, ${fallen} lost`;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fillText(summary, this.canvas.width / 2, this.canvas.height / 2 + 15);
+        this.ctx.font = '20px Quicksand, Segoe UI';
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText('Click anywhere to continue', this.canvas.width / 2, this.canvas.height / 2 + 50);
         this.ctx.restore();
     }
-    drawScore(score, total, levelName) {
+    drawScore(score, total, levelName, fallenCount = 0) {
         this.ctx.save();
         this.ctx.font = 'bold 22px Quicksand, Segoe UI';
         this.ctx.textAlign = 'right';
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         this.ctx.shadowBlur = 6;
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.fillText(`Herd Status: ${score}/${total}`, this.canvas.width - 20, 40);
+        let statusText = `Penned: ${score}/${total}`;
+        if (fallenCount > 0)
+            statusText += `  Lost: ${fallenCount}`;
+        this.ctx.fillText(statusText, this.canvas.width - 20, 40);
         this.ctx.textAlign = 'center';
         this.ctx.fillText(levelName, this.canvas.width / 2, 40);
         this.ctx.restore();
@@ -291,6 +308,90 @@ export default class Renderer {
         this.ctx.closePath();
         this.ctx.fillStyle = '#FFB88A';
         this.ctx.fill();
+    }
+    drawCliff(cliff) {
+        const halfW = cliff.width / 2;
+        const halfH = cliff.height / 2;
+        const x = cliff.pos.x - halfW;
+        const y = cliff.pos.y - halfH;
+        this.ctx.save();
+        // Dark abyss below the cliff
+        this.ctx.fillStyle = 'rgba(20, 15, 10, 0.7)';
+        this.ctx.fillRect(x + 3, y + 3, cliff.width, cliff.height);
+        // Cliff face — jagged brown edge
+        this.ctx.fillStyle = '#6B4226';
+        this.ctx.beginPath();
+        // Top edge — jagged
+        const segments = Math.max(4, Math.floor(cliff.width / 12));
+        this.ctx.moveTo(x, y);
+        for (let i = 1; i < segments; i++) {
+            const t = i / segments;
+            const jx = x + t * cliff.width;
+            const jy = y + (Math.sin(i * 7.3) * 3);
+            this.ctx.lineTo(jx, jy);
+        }
+        this.ctx.lineTo(x + cliff.width, y);
+        this.ctx.lineTo(x + cliff.width, y + cliff.height);
+        // Bottom edge — jagged
+        for (let i = segments - 1; i > 0; i--) {
+            const t = i / segments;
+            const jx = x + t * cliff.width;
+            const jy = y + cliff.height + (Math.sin(i * 5.1) * 3);
+            this.ctx.lineTo(jx, jy);
+        }
+        this.ctx.lineTo(x, y + cliff.height);
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Top highlight stripe
+        this.ctx.fillStyle = '#8B6244';
+        this.ctx.fillRect(x, y, cliff.width, Math.max(2, cliff.height * 0.15));
+        // Edge cracks
+        this.ctx.strokeStyle = 'rgba(40, 25, 15, 0.5)';
+        this.ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            const cx = x + cliff.width * (0.2 + i * 0.3);
+            const cy = y + cliff.height * 0.3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(cx, cy);
+            this.ctx.lineTo(cx + (Math.sin(i * 4) * 5), cy + cliff.height * 0.4);
+            this.ctx.stroke();
+        }
+        // Danger marks — small red triangles along the edge
+        this.ctx.fillStyle = 'rgba(255, 100, 80, 0.25)';
+        const spacing = Math.max(cliff.width, cliff.height) / 4;
+        const isHorizontal = cliff.width > cliff.height;
+        const count = Math.floor((isHorizontal ? cliff.width : cliff.height) / spacing);
+        for (let i = 0; i <= count; i++) {
+            const t = count > 0 ? i / count : 0.5;
+            const mx = isHorizontal ? x + t * cliff.width : cliff.pos.x;
+            const my = isHorizontal ? cliff.pos.y : y + t * cliff.height;
+            this.ctx.beginPath();
+            this.ctx.moveTo(mx, my - 6);
+            this.ctx.lineTo(mx - 4, my + 4);
+            this.ctx.lineTo(mx + 4, my + 4);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        this.ctx.restore();
+    }
+    drawFallenSheep(sheep) {
+        if (sheep.fallenTimer <= 0)
+            return;
+        const alpha = Math.min(1, sheep.fallenTimer);
+        this.ctx.save();
+        this.ctx.globalAlpha = alpha * 0.6;
+        // Dust cloud puffs
+        for (let i = 0; i < 5; i++) {
+            const spread = (1.5 - sheep.fallenTimer) * 20;
+            const angle = (i / 5) * Math.PI * 2;
+            const px = sheep.pos.x + Math.cos(angle) * spread;
+            const py = sheep.pos.y + Math.sin(angle) * spread;
+            this.ctx.fillStyle = 'rgba(180, 160, 130, 0.5)';
+            this.ctx.beginPath();
+            this.ctx.arc(px, py, 4 + spread * 0.3, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        this.ctx.restore();
     }
     drawObstacle(obs) {
         const faces = this.getObstacleFaces(obs);

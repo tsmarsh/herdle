@@ -14,8 +14,10 @@ class Game {
     sheep = [];
     numSheep = 0;
     obstacles = [];
+    cliffs = [];
     pen;
     pennedCount = 0;
+    fallenCount = 0;
     keysPressed = {};
     lastTime = 0;
     currentLevelIndex = 0;
@@ -23,6 +25,8 @@ class Game {
     currentLevelName = '';
     config;
     configOpen = false;
+    levelSelectOpen = true;
+    completedLevels;
     music;
     sound = new SoundEngine();
     constructor() {
@@ -40,13 +44,17 @@ class Game {
         this.renderer = new Renderer(this.canvas, hudItems);
         this.config = loadConfig();
         this.music = new MusicPlayer('music.ogg');
+        // Load completed levels from localStorage
+        const saved = localStorage.getItem('herdle-completed');
+        this.completedLevels = saved ? new Set(JSON.parse(saved)) : new Set();
         this.initGame();
         this.setupInput();
         this.setupConfigUI();
         this.setupMusicUI();
+        this.setupLevelSelect();
         window.addEventListener('resize', () => this.resize());
         this.resize();
-        this.loadLevel(0);
+        this.showLevelSelect();
         requestAnimationFrame((t) => this.loop(t));
     }
     initGame() {
@@ -59,9 +67,11 @@ class Game {
         this.numSheep = levelConfig.numSheep;
         this.levelComplete = false;
         this.pennedCount = 0;
+        this.fallenCount = 0;
         const env = levelConfig.setupEnvironment(this.canvas.width, this.canvas.height);
         this.pen = env.pen;
         this.obstacles = env.obstacles;
+        this.cliffs = env.cliffs ?? [];
         const { sheepPanicRadius, sheepFlockRadius } = this.config.settings;
         this.sheep = env.sheepSpawns.map(pos => new Sheep(pos.x, pos.y, sheepPanicRadius, sheepFlockRadius));
         this.activeDogs = this.dogs.filter(d => levelConfig.availableDogs.includes(d.key));
@@ -75,6 +85,10 @@ class Game {
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if (e.key === 'Escape') {
+                if (this.levelSelectOpen) {
+                    // Don't close level select with Escape at game start
+                    return;
+                }
                 if (this.configOpen) {
                     this.closeConfig();
                 }
@@ -96,15 +110,10 @@ class Game {
             this.updateSelection();
         });
         this.canvas.addEventListener('mousedown', (e) => {
-            if (this.configOpen)
+            if (this.configOpen || this.levelSelectOpen)
                 return;
             if (this.levelComplete) {
-                if (this.currentLevelIndex < LEVELS.length - 1) {
-                    this.loadLevel(this.currentLevelIndex + 1);
-                }
-                else {
-                    this.loadLevel(0);
-                }
+                this.showLevelSelect();
                 return;
             }
             const rect = this.canvas.getBoundingClientRect();
@@ -145,6 +154,53 @@ class Game {
     }
     setupMusicUI() {
         document.getElementById('music-btn')?.addEventListener('click', () => this.toggleMusic());
+    }
+    setupLevelSelect() {
+        const overlay = document.getElementById('level-select-overlay');
+        overlay?.addEventListener('click', (e) => {
+            if (e.target === overlay)
+                return; // don't close on background click
+        });
+    }
+    showLevelSelect() {
+        this.levelSelectOpen = true;
+        const overlay = document.getElementById('level-select-overlay');
+        const grid = document.getElementById('level-grid');
+        if (!overlay || !grid)
+            return;
+        overlay.classList.remove('hidden');
+        grid.innerHTML = '';
+        for (let i = 0; i < LEVELS.length; i++) {
+            const level = LEVELS[i];
+            const card = document.createElement('div');
+            card.className = 'level-card';
+            const env = level.setupEnvironment(800, 600); // probe for cliffs
+            const hasCliffs = env.cliffs && env.cliffs.length > 0;
+            if (hasCliffs)
+                card.classList.add('has-cliffs');
+            if (this.completedLevels.has(i))
+                card.classList.add('completed');
+            const shortName = level.name.replace(/^Level \d+:\s*/, '');
+            card.innerHTML = `
+                <div class="level-number">Level ${i + 1}</div>
+                <div class="level-name">${shortName}</div>
+                <div class="level-info">${level.numSheep} sheep &middot; ${level.availableDogs.length} dog${level.availableDogs.length > 1 ? 's' : ''}${hasCliffs ? ' &middot; cliffs' : ''}</div>
+                ${this.completedLevels.has(i) ? '<div class="level-badge">&#10003;</div>' : ''}
+            `;
+            card.addEventListener('click', () => {
+                this.hideLevelSelect();
+                this.renderer.resetObstacleCache();
+                this.loadLevel(i);
+            });
+            grid.appendChild(card);
+        }
+    }
+    hideLevelSelect() {
+        this.levelSelectOpen = false;
+        document.getElementById('level-select-overlay')?.classList.add('hidden');
+    }
+    saveCompleted() {
+        localStorage.setItem('herdle-completed', JSON.stringify([...this.completedLevels]));
     }
     toggleMusic() {
         this.music.toggle();
@@ -215,7 +271,8 @@ class Game {
         saveConfig(this.config);
         this.renderer.resetObstacleCache();
         this.initGame();
-        this.loadLevel(this.currentLevelIndex);
+        if (this.pen)
+            this.loadLevel(this.currentLevelIndex);
         this.closeConfig();
     }
     resetConfig() {
@@ -225,7 +282,7 @@ class Game {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-        if (this.pen)
+        if (this.pen && !this.levelSelectOpen)
             this.loadLevel(this.currentLevelIndex);
     }
     updateSelection() {
@@ -239,7 +296,7 @@ class Game {
         // Track dog destinations before update (for arrival barks)
         const dogHadDest = this.activeDogs.map(d => d.destination !== null);
         for (const dog of this.activeDogs) {
-            dog.updateDog(dt, this.obstacles, this.canvas.width, this.canvas.height);
+            dog.updateDog(dt, this.obstacles, this.canvas.width, this.canvas.height, this.cliffs);
         }
         // Dog arrival barks
         this.activeDogs.forEach((dog, i) => {
@@ -250,13 +307,23 @@ class Game {
         // Track sheep states before update (for scream triggers)
         const sheepWasSpooked = this.sheep.map(s => s.state === SheepState.SPOOKED);
         let newPennedCount = 0;
+        let newFallenCount = 0;
         for (const s of this.sheep) {
-            s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height);
-            if (this.pen.contains(s)) {
+            if (s.state === SheepState.FALLEN) {
+                s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height, this.cliffs);
+                newFallenCount++;
+                continue;
+            }
+            s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height, this.cliffs);
+            if (s.state === SheepState.FALLEN) {
+                newFallenCount++;
+            }
+            else if (this.pen.contains(s)) {
                 newPennedCount++;
             }
         }
         this.pennedCount = newPennedCount;
+        this.fallenCount = newFallenCount;
         // Sheep sounds
         this.sheep.forEach((s, i) => {
             if (s.state === SheepState.SPOOKED && !sheepWasSpooked[i]) {
@@ -266,17 +333,22 @@ class Game {
                 this.sound.bleat();
             }
         });
-        if (this.pennedCount === this.numSheep) {
+        // Win: all non-fallen sheep are penned
+        if (this.pennedCount === this.numSheep - this.fallenCount) {
             this.levelComplete = true;
+            this.completedLevels.add(this.currentLevelIndex);
+            this.saveCompleted();
         }
     }
     loop(time) {
         const dt = (time - this.lastTime) / 1000;
         this.lastTime = time;
-        if (dt > 0 && dt < 0.1 && !this.configOpen) {
-            this.update(dt);
+        if (this.pen) {
+            if (dt > 0 && dt < 0.1 && !this.configOpen && !this.levelSelectOpen) {
+                this.update(dt);
+            }
+            this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete, this.cliffs, this.fallenCount);
         }
-        this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete);
         requestAnimationFrame((t) => this.loop(t));
     }
 }
