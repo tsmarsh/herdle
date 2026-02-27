@@ -7,6 +7,8 @@ export class Entity {
     color;
     maxSpeed;
     maxForce;
+    angle = 0;
+    animTime = 0;
     constructor(x, y, radius, color) {
         this.pos = new Vector(x, y);
         this.vel = new Vector(0, 0);
@@ -23,6 +25,13 @@ export class Entity {
         this.vel = this.vel.add(this.acc).limit(this.maxSpeed);
         this.pos = this.pos.add(this.vel.mul(dt));
         this.acc = this.acc.mul(0);
+        if (this.vel.mag() > 5) {
+            this.angle = Math.atan2(this.vel.y, this.vel.x);
+            this.animTime += dt * (this.vel.mag() / 20);
+        }
+        else {
+            this.animTime = 0;
+        }
     }
 }
 export class Obstacle {
@@ -76,6 +85,7 @@ export class Dog extends Entity {
         }
     }
     updateDog(dt, obstacles, canvasWidth, canvasHeight) {
+        super.update(dt);
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
             const d = desired.mag();
@@ -85,8 +95,8 @@ export class Dog extends Entity {
             }
             else {
                 const speed = Math.min(this.maxSpeed, d * 5);
-                this.vel = desired.normalize().mul(speed);
-                this.pos = this.pos.add(this.vel.mul(dt));
+                const steer = desired.normalize().mul(speed).sub(this.vel);
+                this.applyForce(steer.limit(this.maxForce * 2));
             }
         }
         for (const obs of obstacles) {
@@ -121,6 +131,7 @@ export class Sheep extends Entity {
     }
     updateSheep(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
         this.updateState(dogs, pen);
+        super.update(dt);
         let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 60 };
         switch (this.state) {
             case SheepState.GRAZING:
