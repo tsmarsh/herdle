@@ -1,9 +1,10 @@
-import { Dog, Sheep, Obstacle, Pen } from './entities.js';
+import { Dog, Sheep, Obstacle, Pen, SheepState } from './entities.js';
 import Renderer from './renderer.js';
 import { LEVELS } from './levels.js';
 import Vector from './vector.js';
 import { GameConfig, loadConfig, saveConfig, DEFAULT_CONFIG } from './config.js';
 import MusicPlayer from './music.js';
+import SoundEngine from './sound.js';
 
 class Game {
     private canvas: HTMLCanvasElement;
@@ -24,6 +25,7 @@ class Game {
     private config: GameConfig;
     private configOpen: boolean = false;
     private music: MusicPlayer;
+    private sound: SoundEngine = new SoundEngine();
 
     constructor() {
         this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -127,7 +129,11 @@ class Game {
 
             for (const dog of this.activeDogs) {
                 if (dog.selected) {
+                    const hadDest = dog.destination !== null;
                     dog.setDestination(mouseX, mouseY);
+                    if (!hadDest && dog.destination) {
+                        this.sound.dogAck(dog.id);
+                    }
                 }
             }
         });
@@ -258,9 +264,22 @@ class Game {
     private update(dt: number): void {
         if (this.levelComplete) return;
 
+        // Track dog destinations before update (for arrival barks)
+        const dogHadDest = this.activeDogs.map(d => d.destination !== null);
+
         for (const dog of this.activeDogs) {
             dog.updateDog(dt, this.obstacles, this.canvas.width, this.canvas.height);
         }
+
+        // Dog arrival barks
+        this.activeDogs.forEach((dog, i) => {
+            if (dogHadDest[i] && dog.destination === null) {
+                this.sound.dogDone(dog.id);
+            }
+        });
+
+        // Track sheep states before update (for scream triggers)
+        const sheepWasSpooked = this.sheep.map(s => s.state === SheepState.SPOOKED);
 
         let newPennedCount = 0;
         for (const s of this.sheep) {
@@ -270,6 +289,15 @@ class Game {
             }
         }
         this.pennedCount = newPennedCount;
+
+        // Sheep sounds
+        this.sheep.forEach((s, i) => {
+            if (s.state === SheepState.SPOOKED && !sheepWasSpooked[i]) {
+                this.sound.scream();
+            } else if (s.state === SheepState.FLOCKING && Math.random() < 0.003) {
+                this.sound.bleat();
+            }
+        });
 
         if (this.pennedCount === this.numSheep) {
             this.levelComplete = true;
