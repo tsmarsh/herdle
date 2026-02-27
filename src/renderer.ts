@@ -36,13 +36,13 @@ export default class Renderer {
         this.ctx = context;
     }
 
-    private init(): void {
+    private init(worldW: number, worldH: number): void {
         if (this.initialized) return;
         this.initialized = true;
 
         // Initialize particles
         for (let i = 0; i < 40; i++) {
-            this.particles.push(this.createParticle());
+            this.particles.push(this.createParticle(worldW, worldH));
         }
 
         // Initialize grass triangles
@@ -50,8 +50,8 @@ export default class Renderer {
         const greens = ['#7EC8A0', '#A8D8B8', '#C2E6CC', '#8FD4A8', '#B5DFC2'];
         for (let i = 0; i < 300; i++) {
             this.grassTriangles.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
+                x: Math.random() * worldW,
+                y: Math.random() * worldH,
                 size: 3 + Math.random() * 8,
                 shade: greens[Math.floor(Math.random() * greens.length)],
                 rotation: Math.random() * Math.PI * 2
@@ -59,10 +59,10 @@ export default class Renderer {
         }
     }
 
-    private createParticle(): Particle {
+    private createParticle(worldW: number = this.canvas.width, worldH: number = this.canvas.height): Particle {
         return {
-            x: Math.random() * this.canvas.width,
-            y: Math.random() * this.canvas.height,
+            x: Math.random() * worldW,
+            y: Math.random() * worldH,
             vx: (Math.random() - 0.5) * 0.3,
             vy: -0.2 - Math.random() * 0.3,
             alpha: 0.2 + Math.random() * 0.4,
@@ -110,19 +110,21 @@ export default class Renderer {
         return faces;
     }
 
-    clear(): void {
+    private clearBackground(): void {
         const w = this.canvas.width;
         const h = this.canvas.height;
 
-        // Gradient base
+        // Gradient base (screen-space)
         const grad = this.ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
         grad.addColorStop(0, '#A8D8B8');
         grad.addColorStop(0.5, '#8CC8A0');
         grad.addColorStop(1, '#6BAE88');
         this.ctx.fillStyle = grad;
         this.ctx.fillRect(0, 0, w, h);
+    }
 
-        // Geometric grass triangles
+    private drawGrass(): void {
+        // Geometric grass triangles (world-space — call inside camera translate)
         for (const tri of this.grassTriangles) {
             this.ctx.save();
             this.ctx.translate(tri.x, tri.y);
@@ -138,8 +140,13 @@ export default class Renderer {
             this.ctx.globalAlpha = 1;
             this.ctx.restore();
         }
+    }
 
-        // Soft vignette overlay
+    private drawVignette(): void {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // Soft vignette overlay (screen-space)
         const vignette = this.ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
         vignette.addColorStop(0, 'rgba(216, 204, 232, 0)');
         vignette.addColorStop(1, 'rgba(216, 204, 232, 0.35)');
@@ -147,15 +154,15 @@ export default class Renderer {
         this.ctx.fillRect(0, 0, w, h);
     }
 
-    private updateParticles(): void {
+    private updateParticles(worldW: number, worldH: number): void {
         for (const p of this.particles) {
             p.x += p.vx;
             p.y += p.vy;
             p.alpha -= p.fadeSpeed;
 
-            if (p.alpha <= 0 || p.y < -10 || p.x < -10 || p.x > this.canvas.width + 10) {
-                Object.assign(p, this.createParticle());
-                p.y = this.canvas.height + 10;
+            if (p.alpha <= 0 || p.y < -10 || p.x < -10 || p.x > worldW + 10) {
+                Object.assign(p, this.createParticle(worldW, worldH));
+                p.y = worldH + 10;
             }
         }
     }
@@ -174,11 +181,21 @@ export default class Renderer {
         this.ctx.restore();
     }
 
-    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number, levelName: string, levelComplete: boolean, cliffs: Cliff[] = [], fallenCount: number = 0): void {
-        this.init();
-        this.clear();
+    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number, levelName: string, levelComplete: boolean, cliffs: Cliff[] = [], fallenCount: number = 0, cameraX: number = 0, cameraY: number = 0, worldWidth: number = 0, worldHeight: number = 0): void {
+        const ww = worldWidth || this.canvas.width;
+        const wh = worldHeight || this.canvas.height;
 
-        this.updateParticles();
+        this.init(ww, wh);
+
+        // Screen-space background
+        this.clearBackground();
+
+        // World-space rendering
+        this.ctx.save();
+        this.ctx.translate(-cameraX, -cameraY);
+
+        this.drawGrass();
+        this.updateParticles(ww, wh);
         this.drawParticles();
 
         this.drawPen(pen);
@@ -203,6 +220,10 @@ export default class Renderer {
             this.drawDog(dog);
         }
 
+        this.ctx.restore();
+
+        // Screen-space overlays
+        this.drawVignette();
         this.drawScore(score, total, levelName, fallenCount);
 
         if (levelComplete) {

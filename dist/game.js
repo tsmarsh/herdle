@@ -3,8 +3,10 @@ import Renderer from './renderer.js';
 import { LEVELS } from './levels.js';
 import Vector from './vector.js';
 import { loadConfig, saveConfig, DEFAULT_CONFIG } from './config.js';
-import MusicPlayer from './music.js';
 import SoundEngine from './sound.js';
+const MIN_WORLD_WIDTH = 1200;
+const MIN_WORLD_HEIGHT = 900;
+const DRAG_THRESHOLD = 10;
 class Game {
     canvas;
     ctx;
@@ -27,9 +29,18 @@ class Game {
     configOpen = false;
     levelSelectOpen = true;
     completedLevels;
-    music;
     sound = new SoundEngine();
     isTouchDevice = 'ontouchstart' in window;
+    // Virtual camera
+    worldWidth = MIN_WORLD_WIDTH;
+    worldHeight = MIN_WORLD_HEIGHT;
+    cameraX = 0;
+    cameraY = 0;
+    touchStartX = 0;
+    touchStartY = 0;
+    touchStartCameraX = 0;
+    touchStartCameraY = 0;
+    isDragging = false;
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         const context = this.canvas.getContext('2d');
@@ -44,7 +55,6 @@ class Game {
         };
         this.renderer = new Renderer(this.canvas, hudItems);
         this.config = loadConfig();
-        this.music = new MusicPlayer('music.ogg');
         // Load completed levels from localStorage
         const saved = localStorage.getItem('herdle-completed');
         this.completedLevels = saved ? new Set(JSON.parse(saved)) : new Set();
@@ -52,7 +62,6 @@ class Game {
         this.setupInput();
         this.setupTouchInput();
         this.setupConfigUI();
-        this.setupMusicUI();
         this.setupLevelSelect();
         window.addEventListener('resize', () => this.resize());
         this.resize();
@@ -70,18 +79,31 @@ class Game {
         this.levelComplete = false;
         this.pennedCount = 0;
         this.fallenCount = 0;
-        const env = levelConfig.setupEnvironment(this.canvas.width, this.canvas.height);
+        const env = levelConfig.setupEnvironment(this.worldWidth, this.worldHeight);
         this.pen = env.pen;
         this.obstacles = env.obstacles;
         this.cliffs = env.cliffs ?? [];
         const { sheepPanicRadius, sheepFlockRadius } = this.config.settings;
         this.sheep = env.sheepSpawns.map(pos => new Sheep(pos.x, pos.y, sheepPanicRadius, sheepFlockRadius));
         this.activeDogs = this.dogs.filter(d => levelConfig.availableDogs.includes(d.key));
+        const startX = this.worldWidth * 0.15;
+        const spacing = 80;
+        const startY = (this.worldHeight - (this.activeDogs.length - 1) * spacing) / 2;
         this.activeDogs.forEach((dog, i) => {
-            dog.pos = new Vector(50, 50 + i * 100);
+            dog.pos = new Vector(startX, startY + i * spacing);
             dog.vel = new Vector();
             dog.destination = null;
         });
+        // Center camera on dogs
+        if (this.needsCamera) {
+            this.cameraX = startX - this.canvas.width / 2;
+            this.cameraY = startY - this.canvas.height / 2;
+            this.clampCamera();
+        }
+        else {
+            this.cameraX = 0;
+            this.cameraY = 0;
+        }
     }
     setupInput() {
         window.addEventListener('keydown', (e) => {
@@ -97,10 +119,6 @@ class Game {
                 else {
                     this.openConfig();
                 }
-                return;
-            }
-            if (key === 'm') {
-                this.toggleMusic();
                 return;
             }
             this.keysPressed[key] = true;
@@ -119,8 +137,7 @@ class Game {
                 return;
             }
             const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const { x: mouseX, y: mouseY } = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
             for (const dog of this.activeDogs) {
                 if (dog.selected) {
                     const hadDest = dog.destination !== null;
@@ -147,19 +164,47 @@ class Game {
         // Update controls hint for touch
         const hint = document.getElementById('controls-hint');
         if (hint)
-            hint.textContent = 'Tap dogs to select. Tap to set destination. Tap name badges to select too.';
+            hint.textContent = 'Tap dogs to select. Tap to set destination. Drag to pan.';
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.touchStartX = touch.clientX;
+            this.touchStartY = touch.clientY;
+            this.touchStartCameraX = this.cameraX;
+            this.touchStartCameraY = this.cameraY;
+            this.isDragging = false;
+        }, { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!this.needsCamera)
+                return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - this.touchStartX;
+            const dy = touch.clientY - this.touchStartY;
+            if (!this.isDragging && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+                this.isDragging = true;
+            }
+            if (this.isDragging) {
+                this.cameraX = this.touchStartCameraX - dx;
+                this.cameraY = this.touchStartCameraY - dy;
+                this.clampCamera();
+            }
+        }, { passive: false });
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (this.configOpen || this.levelSelectOpen)
-                return;
+            // Level complete always works
             if (this.levelComplete) {
                 this.showLevelSelect();
                 return;
             }
+            if (this.configOpen || this.levelSelectOpen)
+                return;
+            // If was dragging, consume the gesture
+            if (this.isDragging)
+                return;
             const touch = e.changedTouches[0];
             const rect = this.canvas.getBoundingClientRect();
-            const tx = touch.clientX - rect.left;
-            const ty = touch.clientY - rect.top;
+            const { x: tx, y: ty } = this.screenToWorld(touch.clientX - rect.left, touch.clientY - rect.top);
             // Check if tapped on a dog (30px hitbox)
             let tappedDog = false;
             for (const dog of this.activeDogs) {
@@ -182,8 +227,6 @@ class Game {
                 }
             }
         });
-        // Prevent scroll/zoom on canvas
-        this.canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     }
     setupConfigUI() {
         const btn = document.getElementById('config-btn');
@@ -207,9 +250,6 @@ class Game {
             });
         }
     }
-    setupMusicUI() {
-        document.getElementById('music-btn')?.addEventListener('click', () => this.toggleMusic());
-    }
     setupLevelSelect() {
         const overlay = document.getElementById('level-select-overlay');
         overlay?.addEventListener('click', (e) => {
@@ -229,7 +269,7 @@ class Game {
             const level = LEVELS[i];
             const card = document.createElement('div');
             card.className = 'level-card';
-            const env = level.setupEnvironment(800, 600); // probe for cliffs
+            const env = level.setupEnvironment(MIN_WORLD_WIDTH, MIN_WORLD_HEIGHT); // probe for cliffs
             const hasCliffs = env.cliffs && env.cliffs.length > 0;
             if (hasCliffs)
                 card.classList.add('has-cliffs');
@@ -256,10 +296,6 @@ class Game {
     }
     saveCompleted() {
         localStorage.setItem('herdle-completed', JSON.stringify([...this.completedLevels]));
-    }
-    toggleMusic() {
-        this.music.toggle();
-        document.getElementById('music-btn')?.classList.toggle('muted', !this.music.isPlaying);
     }
     openConfig() {
         this.configOpen = true;
@@ -337,8 +373,23 @@ class Game {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        this.worldWidth = Math.max(window.innerWidth, MIN_WORLD_WIDTH);
+        this.worldHeight = Math.max(window.innerHeight, MIN_WORLD_HEIGHT);
+        this.clampCamera();
         if (this.pen && !this.levelSelectOpen)
             this.loadLevel(this.currentLevelIndex);
+    }
+    clampCamera() {
+        const maxX = this.worldWidth - this.canvas.width;
+        const maxY = this.worldHeight - this.canvas.height;
+        this.cameraX = Math.max(0, Math.min(this.cameraX, maxX));
+        this.cameraY = Math.max(0, Math.min(this.cameraY, maxY));
+    }
+    screenToWorld(sx, sy) {
+        return { x: sx + this.cameraX, y: sy + this.cameraY };
+    }
+    get needsCamera() {
+        return this.worldWidth > this.canvas.width || this.worldHeight > this.canvas.height;
     }
     updateSelection() {
         for (const dog of this.activeDogs) {
@@ -351,7 +402,7 @@ class Game {
         // Track dog destinations before update (for arrival barks)
         const dogHadDest = this.activeDogs.map(d => d.destination !== null);
         for (const dog of this.activeDogs) {
-            dog.updateDog(dt, this.obstacles, this.canvas.width, this.canvas.height, this.cliffs);
+            dog.updateDog(dt, this.obstacles, this.worldWidth, this.worldHeight, this.cliffs);
         }
         // Dog arrival barks
         this.activeDogs.forEach((dog, i) => {
@@ -365,11 +416,11 @@ class Game {
         let newFallenCount = 0;
         for (const s of this.sheep) {
             if (s.state === SheepState.FALLEN) {
-                s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height, this.cliffs);
+                s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.worldWidth, this.worldHeight, this.cliffs);
                 newFallenCount++;
                 continue;
             }
-            s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height, this.cliffs);
+            s.updateSheep(dt, this.activeDogs, this.sheep, this.obstacles, this.pen, this.worldWidth, this.worldHeight, this.cliffs);
             if (s.state === SheepState.FALLEN) {
                 newFallenCount++;
             }
@@ -402,7 +453,7 @@ class Game {
             if (dt > 0 && dt < 0.1 && !this.configOpen && !this.levelSelectOpen) {
                 this.update(dt);
             }
-            this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete, this.cliffs, this.fallenCount);
+            this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete, this.cliffs, this.fallenCount, this.cameraX, this.cameraY, this.worldWidth, this.worldHeight);
         }
         requestAnimationFrame((t) => this.loop(t));
     }
