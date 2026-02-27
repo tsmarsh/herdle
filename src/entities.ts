@@ -63,7 +63,7 @@ export class Dog extends Entity {
 
     constructor(public id: string, public name: string, public key: string, color: string, x: number, y: number) {
         super(x, y, 12, color);
-        this.maxSpeed = 150;
+        this.maxSpeed = 300;
     }
 
     setDestination(x: number, y: number): void {
@@ -119,27 +119,27 @@ export class Sheep extends Entity {
 
     constructor(x: number, y: number) {
         super(x, y, 8, 'white');
-        this.maxSpeed = 80;
-        this.maxForce = 5;
+        this.maxSpeed = 300;
+        this.maxForce = 8;
     }
 
     updateSheep(dt: number, dogs: Dog[], others: Sheep[], obstacles: Obstacle[], pen: Pen, canvasWidth: number, canvasHeight: number): void {
         this.updateState(dogs, pen);
 
-        let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 40 };
+        let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 60 };
 
         switch (this.state) {
             case SheepState.GRAZING:
-                weights.wander = 0.5; weights.separation = 2.0; weights.speed = 30;
+                weights.wander = 0.5; weights.separation = 2.0; weights.speed = 60;
                 break;
             case SheepState.FLOCKING:
-                weights.cohesion = 1.2; weights.alignment = 1.0; weights.separation = 1.5; weights.flee = 1.5; weights.speed = 70;
+                weights.cohesion = 1.2; weights.alignment = 1.0; weights.separation = 1.5; weights.flee = 2.0; weights.speed = 140;
                 break;
             case SheepState.SPOOKED:
-                weights.flee = 4.0; weights.separation = 3.0; weights.cohesion = 0.5; weights.speed = 140;
+                weights.flee = 4.5; weights.separation = 3.5; weights.cohesion = 0.5; weights.speed = 240;
                 break;
             case SheepState.PENNED:
-                weights = { flee: 0, cohesion: 0.5, separation: 1.0, alignment: 0, wander: 0, pen: 0, speed: 10 };
+                weights = { flee: 0, cohesion: 0.5, separation: 1.0, alignment: 0, wander: 0, pen: 0, speed: 15 };
                 break;
         }
 
