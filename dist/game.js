@@ -29,6 +29,7 @@ class Game {
     completedLevels;
     music;
     sound = new SoundEngine();
+    isTouchDevice = 'ontouchstart' in window;
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         const context = this.canvas.getContext('2d');
@@ -49,6 +50,7 @@ class Game {
         this.completedLevels = saved ? new Set(JSON.parse(saved)) : new Set();
         this.initGame();
         this.setupInput();
+        this.setupTouchInput();
         this.setupConfigUI();
         this.setupMusicUI();
         this.setupLevelSelect();
@@ -129,6 +131,59 @@ class Game {
                 }
             }
         });
+    }
+    setupTouchInput() {
+        // HUD items are tappable on all devices
+        for (const dog of this.dogs) {
+            const hudEl = document.getElementById(`dog-${dog.id}`);
+            hudEl?.addEventListener('click', () => {
+                if (!this.activeDogs.includes(dog))
+                    return;
+                dog.selected = !dog.selected;
+            });
+        }
+        if (!this.isTouchDevice)
+            return;
+        // Update controls hint for touch
+        const hint = document.getElementById('controls-hint');
+        if (hint)
+            hint.textContent = 'Tap dogs to select. Tap to set destination. Tap name badges to select too.';
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (this.configOpen || this.levelSelectOpen)
+                return;
+            if (this.levelComplete) {
+                this.showLevelSelect();
+                return;
+            }
+            const touch = e.changedTouches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            const tx = touch.clientX - rect.left;
+            const ty = touch.clientY - rect.top;
+            // Check if tapped on a dog (30px hitbox)
+            let tappedDog = false;
+            for (const dog of this.activeDogs) {
+                if (dog.pos.dist(new Vector(tx, ty)) < 30) {
+                    dog.selected = !dog.selected;
+                    tappedDog = true;
+                    break;
+                }
+            }
+            // If didn't tap a dog, set destination for selected dogs
+            if (!tappedDog) {
+                for (const dog of this.activeDogs) {
+                    if (dog.selected) {
+                        const hadDest = dog.destination !== null;
+                        dog.setDestination(tx, ty);
+                        if (!hadDest && dog.destination) {
+                            this.sound.dogAck(dog.id);
+                        }
+                    }
+                }
+            }
+        });
+        // Prevent scroll/zoom on canvas
+        this.canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     }
     setupConfigUI() {
         const btn = document.getElementById('config-btn');
