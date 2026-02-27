@@ -65,7 +65,7 @@ export class Dog extends Entity {
         this.id = id;
         this.name = name;
         this.key = key;
-        this.maxSpeed = 150;
+        this.maxSpeed = 300;
     }
     setDestination(x, y) {
         if (this.destination) {
@@ -116,33 +116,33 @@ export class Sheep extends Entity {
     wanderAngle = Math.random() * Math.PI * 2;
     constructor(x, y) {
         super(x, y, 8, 'white');
-        this.maxSpeed = 80;
-        this.maxForce = 5;
+        this.maxSpeed = 300;
+        this.maxForce = 8;
     }
     updateSheep(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
         this.updateState(dogs, pen);
-        let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 40 };
+        let weights = { flee: 0, cohesion: 0, separation: 1.5, alignment: 0, wander: 0, pen: 0.1, speed: 60 };
         switch (this.state) {
             case SheepState.GRAZING:
                 weights.wander = 0.5;
                 weights.separation = 2.0;
-                weights.speed = 30;
+                weights.speed = 60;
                 break;
             case SheepState.FLOCKING:
                 weights.cohesion = 1.2;
                 weights.alignment = 1.0;
                 weights.separation = 1.5;
-                weights.flee = 1.5;
-                weights.speed = 70;
-                break;
-            case SheepState.SPOOKED:
-                weights.flee = 4.0;
-                weights.separation = 3.0;
-                weights.cohesion = 0.5;
+                weights.flee = 2.0;
                 weights.speed = 140;
                 break;
+            case SheepState.SPOOKED:
+                weights.flee = 4.5;
+                weights.separation = 3.5;
+                weights.cohesion = 0.5;
+                weights.speed = 240;
+                break;
             case SheepState.PENNED:
-                weights = { flee: 0, cohesion: 0.5, separation: 1.0, alignment: 0, wander: 0, pen: 0, speed: 10 };
+                weights = { flee: 0, cohesion: 0.5, separation: 1.0, alignment: 0, wander: 0, pen: 0, speed: 15 };
                 break;
         }
         const forces = [
