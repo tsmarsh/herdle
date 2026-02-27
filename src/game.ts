@@ -1,19 +1,33 @@
-import { Dog, Sheep, Obstacle, Pen } from './entities.js';
-import Vector from './vector.js';
-import Renderer from './renderer.js';
+import { Dog, Sheep, Obstacle, Pen } from './entities';
+import Renderer from './renderer';
 
 class Game {
+    private canvas: HTMLCanvasElement;
+    private ctx: CanvasRenderingContext2D;
+    private renderer: Renderer;
+    private dogs: Dog[];
+    private sheep: Sheep[] = [];
+    private numSheep: number = 20;
+    private obstacles: Obstacle[] = [];
+    private pen!: Pen;
+    private pennedCount: number = 0;
+    private keysPressed: Record<string, boolean> = {};
+    private lastTime: number = 0;
+
     constructor() {
-        this.canvas = document.getElementById('game-canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.hudItems = {
+        this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+        const context = this.canvas.getContext('2d');
+        if (!context) throw new Error('Could not get canvas context');
+        this.ctx = context;
+
+        const hudItems = {
             'dog-ace': document.getElementById('dog-ace'),
             'dog-shep': document.getElementById('dog-shep'),
             'dog-duke': document.getElementById('dog-duke'),
             'dog-fido': document.getElementById('dog-fido')
         };
 
-        this.renderer = new Renderer(this.canvas, this.hudItems);
+        this.renderer = new Renderer(this.canvas, hudItems);
         
         this.dogs = [
             new Dog('ace', 'Ace', 'a', '#ff4d4d', 50, 50),
@@ -22,34 +36,21 @@ class Game {
             new Dog('fido', 'Fido', 'f', '#b34dff', 150, 150)
         ];
 
-        this.sheep = [];
-        this.numSheep = 20;
-        this.obstacles = [];
-        this.pen = null;
-        this.pennedCount = 0;
-        
-        this.keysPressed = {};
-        this.mousePos = new Vector(0, 0);
-
-        this.lastTime = 0;
         this.setup();
     }
 
-    setup() {
+    private setup(): void {
         window.addEventListener('resize', () => this.resize());
         this.resize();
 
-        // Create environment
         this.pen = new Pen(this.canvas.width - 250, this.canvas.height - 250, 200, 200);
         
-        // Add some random obstacles
         for (let i = 0; i < 5; i++) {
             const x = 200 + Math.random() * (this.canvas.width - 400);
             const y = 200 + Math.random() * (this.canvas.height - 400);
             this.obstacles.push(new Obstacle(x, y, 30 + Math.random() * 40));
         }
 
-        // Initial sheep placement (opposite side of pen)
         for (let i = 0; i < this.numSheep; i++) {
             this.sheep.push(new Sheep(
                 100 + Math.random() * 300,
@@ -57,7 +58,6 @@ class Game {
             ));
         }
 
-        // Input handling
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             this.keysPressed[key] = true;
@@ -75,7 +75,6 @@ class Game {
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
 
-            // Apply to selected dogs
             for (const dog of this.dogs) {
                 if (dog.selected) {
                     dog.setDestination(mouseX, mouseY);
@@ -86,25 +85,25 @@ class Game {
         requestAnimationFrame((t) => this.loop(t));
     }
 
-    resize() {
+    private resize(): void {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
     }
 
-    updateSelection() {
+    private updateSelection(): void {
         for (const dog of this.dogs) {
-            dog.selected = this.keysPressed[dog.key];
+            dog.selected = !!this.keysPressed[dog.key];
         }
     }
 
-    update(dt) {
+    private update(dt: number): void {
         for (const dog of this.dogs) {
-            dog.update(dt, this.obstacles, this.canvas.width, this.canvas.height);
+            dog.updateDog(dt, this.obstacles, this.canvas.width, this.canvas.height);
         }
 
         let newPennedCount = 0;
         for (const s of this.sheep) {
-            s.update(dt, this.dogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height);
+            s.updateSheep(dt, this.dogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height);
             if (this.pen.contains(s)) {
                 newPennedCount++;
             }
@@ -112,7 +111,7 @@ class Game {
         this.pennedCount = newPennedCount;
     }
 
-    loop(time) {
+    private loop(time: number): void {
         const dt = (time - this.lastTime) / 1000;
         this.lastTime = time;
 
