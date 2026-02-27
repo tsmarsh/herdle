@@ -40,8 +40,7 @@ class Game {
 
         this.renderer = new Renderer(this.canvas, hudItems);
         this.config = loadConfig();
-        this.music = new MusicPlayer();
-        this.music.load('tune-for-man-and-his-dog.mid');
+        this.music = new MusicPlayer('music.ogg');
 
         this.initGame();
         this.setupInput();
