@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>Herdle: 2D Top-Down Herding Game</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +12,7 @@
 <body>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
+        <div id="safe-area-probe" style="position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);pointer-events:none"></div>
         <div id="hud">
             <div class="hud-item" id="dog-ace">Ace (A)</div>
             <div class="hud-item" id="dog-shep">Shep (S)</div>

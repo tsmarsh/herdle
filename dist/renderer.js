@@ -142,7 +142,7 @@ export default class Renderer {
         this.ctx.shadowBlur = 0;
         this.ctx.restore();
     }
-    draw(dogs, sheep, obstacles, pen, score, total, levelName, levelComplete, cliffs = [], fallenCount = 0, cameraX = 0, cameraY = 0, worldWidth = 0, worldHeight = 0) {
+    draw(dogs, sheep, obstacles, pen, score, total, levelName, levelComplete, cliffs = [], fallenCount = 0, cameraX = 0, cameraY = 0, worldWidth = 0, worldHeight = 0, safeAreaTop = 0) {
         const ww = worldWidth || this.canvas.width;
         const wh = worldHeight || this.canvas.height;
         this.init(ww, wh);
@@ -175,7 +175,7 @@ export default class Renderer {
         this.ctx.restore();
         // Screen-space overlays
         this.drawVignette();
-        this.drawScore(score, total, levelName, fallenCount);
+        this.drawScore(score, total, levelName, fallenCount, safeAreaTop);
         if (levelComplete) {
             this.drawLevelComplete(score, fallenCount);
         }
@@ -204,7 +204,8 @@ export default class Renderer {
         this.ctx.fillText('Click anywhere to continue', this.canvas.width / 2, this.canvas.height / 2 + 50);
         this.ctx.restore();
     }
-    drawScore(score, total, levelName, fallenCount = 0) {
+    drawScore(score, total, levelName, fallenCount = 0, safeAreaTop = 0) {
+        const y = 40 + safeAreaTop;
         this.ctx.save();
         this.ctx.font = 'bold 22px Quicksand, Segoe UI';
         this.ctx.textAlign = 'right';
@@ -214,9 +215,9 @@ export default class Renderer {
         let statusText = `Penned: ${score}/${total}`;
         if (fallenCount > 0)
             statusText += `  Lost: ${fallenCount}`;
-        this.ctx.fillText(statusText, this.canvas.width - 20, 40);
+        this.ctx.fillText(statusText, this.canvas.width - 20, y);
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(levelName, this.canvas.width / 2, 40);
+        this.ctx.fillText(levelName, this.canvas.width / 2, y);
         this.ctx.restore();
     }
     updateHUD(activeDogs) {

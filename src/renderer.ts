@@ -181,7 +181,7 @@ export default class Renderer {
         this.ctx.restore();
     }
 
-    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number, levelName: string, levelComplete: boolean, cliffs: Cliff[] = [], fallenCount: number = 0, cameraX: number = 0, cameraY: number = 0, worldWidth: number = 0, worldHeight: number = 0): void {
+    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number, levelName: string, levelComplete: boolean, cliffs: Cliff[] = [], fallenCount: number = 0, cameraX: number = 0, cameraY: number = 0, worldWidth: number = 0, worldHeight: number = 0, safeAreaTop: number = 0): void {
         const ww = worldWidth || this.canvas.width;
         const wh = worldHeight || this.canvas.height;
 
@@ -224,7 +224,7 @@ export default class Renderer {
 
         // Screen-space overlays
         this.drawVignette();
-        this.drawScore(score, total, levelName, fallenCount);
+        this.drawScore(score, total, levelName, fallenCount, safeAreaTop);
 
         if (levelComplete) {
             this.drawLevelComplete(score, fallenCount);
@@ -260,7 +260,8 @@ export default class Renderer {
         this.ctx.restore();
     }
 
-    private drawScore(score: number, total: number, levelName: string, fallenCount: number = 0): void {
+    private drawScore(score: number, total: number, levelName: string, fallenCount: number = 0, safeAreaTop: number = 0): void {
+        const y = 40 + safeAreaTop;
         this.ctx.save();
         this.ctx.font = 'bold 22px Quicksand, Segoe UI';
         this.ctx.textAlign = 'right';
@@ -269,10 +270,10 @@ export default class Renderer {
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
         let statusText = `Penned: ${score}/${total}`;
         if (fallenCount > 0) statusText += `  Lost: ${fallenCount}`;
-        this.ctx.fillText(statusText, this.canvas.width - 20, 40);
+        this.ctx.fillText(statusText, this.canvas.width - 20, y);
 
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(levelName, this.canvas.width / 2, 40);
+        this.ctx.fillText(levelName, this.canvas.width / 2, y);
         this.ctx.restore();
     }
 

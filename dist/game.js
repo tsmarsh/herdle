@@ -41,6 +41,7 @@ class Game {
     touchStartCameraX = 0;
     touchStartCameraY = 0;
     isDragging = false;
+    safeAreaTop = 0;
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         const context = this.canvas.getContext('2d');
@@ -375,6 +376,7 @@ class Game {
         this.canvas.height = window.innerHeight;
         this.worldWidth = Math.max(window.innerWidth, MIN_WORLD_WIDTH);
         this.worldHeight = Math.max(window.innerHeight, MIN_WORLD_HEIGHT);
+        this.safeAreaTop = document.getElementById('safe-area-probe')?.offsetHeight ?? 0;
         this.clampCamera();
         if (this.pen && !this.levelSelectOpen)
             this.loadLevel(this.currentLevelIndex);
@@ -453,7 +455,7 @@ class Game {
             if (dt > 0 && dt < 0.1 && !this.configOpen && !this.levelSelectOpen) {
                 this.update(dt);
             }
-            this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete, this.cliffs, this.fallenCount, this.cameraX, this.cameraY, this.worldWidth, this.worldHeight);
+            this.renderer.draw(this.activeDogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep, this.currentLevelName, this.levelComplete, this.cliffs, this.fallenCount, this.cameraX, this.cameraY, this.worldWidth, this.worldHeight, this.safeAreaTop);
         }
         requestAnimationFrame((t) => this.loop(t));
     }
