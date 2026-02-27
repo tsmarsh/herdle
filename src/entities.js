@@ -99,14 +99,6 @@ export class Dog extends Entity {
     }
 }
 
-export class Sheep extends Entity {
-    constructor(x, y) {
-        super(x, y, 8, 'white');
-        this.maxSpeed = 80;
-        this.maxForce = 5;
-        this.wanderAngle = Math.random() * Math.PI * 2;
-    }
-
 export const SheepState = {
     GRAZING: 'grazing',
     FLOCKING: 'flocking',
