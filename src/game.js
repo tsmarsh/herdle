@@ -1,4 +1,4 @@
-import { Dog, Sheep } from './entities.js';
+import { Dog, Sheep, Obstacle, Pen } from './entities.js';
 import Vector from './vector.js';
 import Renderer from './renderer.js';
 
@@ -23,7 +23,10 @@ class Game {
         ];
 
         this.sheep = [];
-        this.numSheep = 18;
+        this.numSheep = 20;
+        this.obstacles = [];
+        this.pen = null;
+        this.pennedCount = 0;
         
         this.keysPressed = {};
         this.mousePos = new Vector(0, 0);
@@ -36,12 +39,21 @@ class Game {
         window.addEventListener('resize', () => this.resize());
         this.resize();
 
-        // Initial sheep placement
+        // Create environment
+        this.pen = new Pen(this.canvas.width - 250, this.canvas.height - 250, 200, 200);
+        
+        // Add some random obstacles
+        for (let i = 0; i < 5; i++) {
+            const x = 200 + Math.random() * (this.canvas.width - 400);
+            const y = 200 + Math.random() * (this.canvas.height - 400);
+            this.obstacles.push(new Obstacle(x, y, 30 + Math.random() * 40));
+        }
+
+        // Initial sheep placement (opposite side of pen)
         for (let i = 0; i < this.numSheep; i++) {
-            const margin = 100;
             this.sheep.push(new Sheep(
-                margin + Math.random() * (this.canvas.width - 2 * margin),
-                margin + Math.random() * (this.canvas.height - 2 * margin)
+                100 + Math.random() * 300,
+                200 + Math.random() * (this.canvas.height - 400)
             ));
         }
 
@@ -87,23 +99,28 @@ class Game {
 
     update(dt) {
         for (const dog of this.dogs) {
-            dog.update(dt, this.canvas.width, this.canvas.height);
+            dog.update(dt, this.obstacles, this.canvas.width, this.canvas.height);
         }
 
+        let newPennedCount = 0;
         for (const s of this.sheep) {
-            s.update(dt, this.dogs, this.sheep, this.canvas.width, this.canvas.height);
+            s.update(dt, this.dogs, this.sheep, this.obstacles, this.pen, this.canvas.width, this.canvas.height);
+            if (this.pen.contains(s)) {
+                newPennedCount++;
+            }
         }
+        this.pennedCount = newPennedCount;
     }
 
     loop(time) {
         const dt = (time - this.lastTime) / 1000;
         this.lastTime = time;
 
-        if (dt > 0 && dt < 0.1) { // Avoid huge jumps if frame drops
+        if (dt > 0 && dt < 0.1) {
             this.update(dt);
         }
 
-        this.renderer.draw(this.dogs, this.sheep);
+        this.renderer.draw(this.dogs, this.sheep, this.obstacles, this.pen, this.pennedCount, this.numSheep);
         requestAnimationFrame((t) => this.loop(t));
     }
 }

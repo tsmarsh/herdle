@@ -22,6 +22,33 @@ export class Entity {
     }
 }
 
+export class Obstacle {
+    constructor(x, y, radius) {
+        this.pos = new Vector(x, y);
+        this.radius = radius;
+        this.color = '#333';
+    }
+}
+
+export class Pen {
+    constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.center = new Vector(x + width / 2, y + height / 2);
+    }
+
+    contains(entity) {
+        return (
+            entity.pos.x > this.x &&
+            entity.pos.x < this.x + this.width &&
+            entity.pos.y > this.y &&
+            entity.pos.y < this.y + this.height
+        );
+    }
+}
+
 export class Dog extends Entity {
     constructor(id, name, key, color, x, y) {
         super(x, y, 12, color);
@@ -41,7 +68,7 @@ export class Dog extends Entity {
         }
     }
 
-    update(dt, canvasWidth, canvasHeight) {
+    update(dt, obstacles, canvasWidth, canvasHeight) {
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
             const d = desired.mag();
@@ -53,6 +80,16 @@ export class Dog extends Entity {
                 const speed = Math.min(this.maxSpeed, d * 5); // slow down as it arrives
                 this.vel = desired.normalize().mul(speed);
                 this.pos = this.pos.add(this.vel.mul(dt));
+            }
+        }
+        
+        // Obstacle avoidance/collision
+        for (const obs of obstacles) {
+            const dist = this.pos.dist(obs.pos);
+            const combinedRadius = this.radius + obs.radius;
+            if (dist < combinedRadius) {
+                const diff = this.pos.sub(obs.pos).normalize().mul(combinedRadius);
+                this.pos = obs.pos.add(diff);
             }
         }
         
@@ -70,25 +107,44 @@ export class Sheep extends Entity {
         this.wanderAngle = Math.random() * Math.PI * 2;
     }
 
-    update(dt, dogs, others, canvasWidth, canvasHeight) {
+    update(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
         // Behaviors
-        const fleeForce = this.flee(dogs).mul(2.5);
-        const cohesionForce = this.cohesion(others).mul(1.0);
-        const separationForce = this.separation(others).mul(1.5);
-        const wanderForce = this.wander().mul(0.5);
+        const fleeForce = this.flee(dogs).mul(3.0);
+        const cohesionForce = this.cohesion(others).mul(1.2);
+        const separationForce = this.separation(others).mul(1.8);
+        const alignmentForce = this.alignment(others).mul(1.0);
+        const wanderForce = this.wander().mul(0.3);
+        
+        // Gentle drive towards the pen if they are somewhat near it
+        let penForce = new Vector(0, 0);
+        if (pen) {
+            const distToPen = this.pos.dist(pen.center);
+            if (distToPen < 300) {
+                penForce = this.seek(pen.center).mul(0.2);
+            }
+        }
 
         this.applyForce(fleeForce);
         this.applyForce(cohesionForce);
         this.applyForce(separationForce);
+        this.applyForce(alignmentForce);
         this.applyForce(wanderForce);
+        this.applyForce(penForce);
+
+        // Obstacle avoidance
+        for (const obs of obstacles) {
+            const avoid = this.avoidObstacle(obs);
+            this.applyForce(avoid.mul(4.0));
+        }
 
         // Standard update
-        this.vel = this.vel.add(this.acc.mul(dt)).limit(this.maxSpeed);
+        const speedMult = fleeForce.mag() > 0.1 ? 1.5 : 1.0;
+        this.vel = this.vel.add(this.acc.mul(dt)).limit(this.maxSpeed * speedMult);
         this.pos = this.pos.add(this.vel.mul(dt));
         this.acc = this.acc.mul(0);
 
         // Boundary repulsion
-        const margin = 50;
+        const margin = 40;
         if (this.pos.x < margin) this.applyForce(new Vector(this.maxForce, 0));
         if (this.pos.x > canvasWidth - margin) this.applyForce(new Vector(-this.maxForce, 0));
         if (this.pos.y < margin) this.applyForce(new Vector(0, this.maxForce));
@@ -98,10 +154,39 @@ export class Sheep extends Entity {
         this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
         this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
         
-        // Friction when no forces
-        if (fleeForce.mag() === 0 && wanderForce.mag() < 0.1) {
-            this.vel = this.vel.mul(0.95);
+        // Natural friction/damping
+        this.vel = this.vel.mul(0.98);
+    }
+
+    alignment(others) {
+        const perception = 60;
+        let steer = new Vector(0, 0);
+        let count = 0;
+
+        for (const other of others) {
+            const d = this.pos.dist(other.pos);
+            if (other !== this && d < perception) {
+                steer = steer.add(other.vel);
+                count++;
+            }
         }
+
+        if (count > 0) {
+            steer = steer.div(count);
+            steer = steer.normalize().mul(this.maxSpeed).sub(this.vel);
+            return steer.limit(this.maxForce);
+        }
+        return new Vector(0, 0);
+    }
+
+    avoidObstacle(obs) {
+        const dist = this.pos.dist(obs.pos);
+        const combinedRadius = this.radius + obs.radius + 20;
+        if (dist < combinedRadius) {
+            let diff = this.pos.sub(obs.pos);
+            return diff.normalize().mul(this.maxForce).div(dist * 0.01);
+        }
+        return new Vector(0, 0);
     }
 
     flee(dogs) {

@@ -9,10 +9,18 @@ export default class Renderer {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    draw(dogs, sheep) {
+    draw(dogs, sheep, obstacles, pen, score, total) {
         this.clear();
 
-        // Draw sheep first
+        // Draw pen/goal area
+        this.drawPen(pen);
+
+        // Draw obstacles
+        for (const obs of obstacles) {
+            this.drawObstacle(obs);
+        }
+
+        // Draw sheep
         for (const s of sheep) {
             this.drawSheep(s);
         }
@@ -22,7 +30,46 @@ export default class Renderer {
             this.drawDog(dog);
         }
 
+        this.drawScore(score, total);
         this.updateHUD(dogs);
+    }
+
+    drawPen(pen) {
+        this.ctx.fillStyle = '#6ab06a'; // Lighter green for pen
+        this.ctx.fillRect(pen.x, pen.y, pen.width, pen.height);
+        this.ctx.strokeStyle = '#fff';
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([10, 5]);
+        this.ctx.strokeRect(pen.x, pen.y, pen.width, pen.height);
+        this.ctx.setLineDash([]);
+        
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = 'bold 20px Segoe UI';
+        this.ctx.fillText('PEN', pen.x + pen.width / 2, pen.y + pen.height / 2 + 8);
+    }
+
+    drawObstacle(obs) {
+        this.ctx.beginPath();
+        this.ctx.arc(obs.pos.x, obs.pos.y, obs.radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = '#4a3b2b'; // Dark brown rock
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#333';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+    }
+
+    drawScore(score, total) {
+        this.ctx.font = 'bold 24px Segoe UI';
+        this.ctx.textAlign = 'right';
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText(`Herd Status: ${score}/${total}`, this.canvas.width - 20, 40);
+        
+        if (score === total) {
+            this.ctx.font = 'bold 48px Segoe UI';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillStyle = 'gold';
+            this.ctx.fillText('FLOCK HERDED!', this.canvas.width / 2, this.canvas.height / 2);
+        }
     }
 
     drawSheep(sheep) {
