@@ -3,6 +3,7 @@ import Renderer from './renderer.js';
 import { LEVELS } from './levels.js';
 import Vector from './vector.js';
 import { GameConfig, loadConfig, saveConfig, DEFAULT_CONFIG } from './config.js';
+import MusicPlayer from './music.js';
 
 class Game {
     private canvas: HTMLCanvasElement;
@@ -22,6 +23,7 @@ class Game {
     private currentLevelName: string = '';
     private config: GameConfig;
     private configOpen: boolean = false;
+    private music: MusicPlayer;
 
     constructor() {
         this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -38,10 +40,13 @@ class Game {
 
         this.renderer = new Renderer(this.canvas, hudItems);
         this.config = loadConfig();
+        this.music = new MusicPlayer();
+        this.music.load('tune-for-man-and-his-dog.mid');
 
         this.initGame();
         this.setupInput();
         this.setupConfigUI();
+        this.setupMusicUI();
         window.addEventListener('resize', () => this.resize());
         this.resize();
         this.loadLevel(0);
@@ -87,6 +92,11 @@ class Game {
                 } else {
                     this.openConfig();
                 }
+                return;
+            }
+
+            if (key === 'm') {
+                this.toggleMusic();
                 return;
             }
 
@@ -145,6 +155,15 @@ class Game {
                 if (display) display.textContent = slider.value;
             });
         }
+    }
+
+    private setupMusicUI(): void {
+        document.getElementById('music-btn')?.addEventListener('click', () => this.toggleMusic());
+    }
+
+    private toggleMusic(): void {
+        this.music.toggle();
+        document.getElementById('music-btn')?.classList.toggle('muted', !this.music.isPlaying);
     }
 
     private openConfig(): void {
