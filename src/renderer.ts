@@ -71,6 +71,11 @@ export default class Renderer {
         };
     }
 
+    resetObstacleCache(): void {
+        this.obstacleShapes.clear();
+        this.initialized = false;
+    }
+
     private getObstacleFaces(obs: Obstacle): ObstacleFace[] {
         let faces = this.obstacleShapes.get(obs);
         if (faces) return faces;
@@ -169,7 +174,7 @@ export default class Renderer {
         this.ctx.restore();
     }
 
-    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number): void {
+    draw(dogs: Dog[], sheep: Sheep[], obstacles: Obstacle[], pen: Pen, score: number, total: number, levelName: string, levelComplete: boolean): void {
         this.init();
         this.clear();
 
@@ -190,8 +195,71 @@ export default class Renderer {
             this.drawDog(dog);
         }
 
-        this.drawScore(score, total);
+        this.drawScore(score, total, levelName);
+        
+        if (levelComplete) {
+            this.drawLevelComplete();
+        }
+
         this.updateHUD(dogs);
+    }
+
+    private drawLevelComplete(): void {
+        this.ctx.save();
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.font = 'bold 52px Quicksand, Segoe UI';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        this.ctx.shadowBlur = 15;
+        this.ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
+        this.ctx.fillStyle = '#FFF5D0';
+        this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2 - 20);
+
+        this.ctx.font = '24px Quicksand, Segoe UI';
+        this.ctx.fillStyle = 'white';
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillText('Click anywhere to proceed to the next level', this.canvas.width / 2, this.canvas.height / 2 + 30);
+        this.ctx.restore();
+    }
+
+    private drawScore(score: number, total: number, levelName: string): void {
+        this.ctx.save();
+        this.ctx.font = 'bold 22px Quicksand, Segoe UI';
+        this.ctx.textAlign = 'right';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.shadowBlur = 6;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.fillText(`Herd Status: ${score}/${total}`, this.canvas.width - 20, 40);
+        
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(levelName, this.canvas.width / 2, 40);
+        this.ctx.restore();
+    }
+
+    private updateHUD(activeDogs: Dog[]): void {
+        Object.values(this.hudItems).forEach(el => {
+            if (el) el.style.display = 'none';
+        });
+
+        for (const dog of activeDogs) {
+            const hudId = `dog-${dog.id}`;
+            const element = this.hudItems[hudId];
+            if (element) {
+                element.style.display = 'block';
+                if (dog.selected) {
+                    element.classList.add('selected');
+                } else {
+                    element.classList.remove('selected');
+                }
+
+                const state = dog.destination ? 'Moving' : 'Idle';
+                element.innerHTML = `${dog.name} (${dog.key.toUpperCase()}) <br/> <small>${state}</small>`;
+                element.style.color = dog.color;
+            }
+        }
     }
 
     private drawPen(pen: Pen): void {
@@ -581,74 +649,5 @@ export default class Renderer {
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.ctx.fillText(dog.name, dog.pos.x, dog.pos.y - 25);
         this.ctx.restore();
-    }
-
-    private drawScore(score: number, total: number): void {
-        this.ctx.save();
-        this.ctx.font = 'bold 22px Quicksand, Segoe UI';
-        this.ctx.textAlign = 'right';
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        this.ctx.shadowBlur = 6;
-        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.fillText(`Herd Status: ${score}/${total}`, this.canvas.width - 20, 40);
-        this.ctx.restore();
-
-        if (score === total) {
-            this.ctx.save();
-            // Background dim
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-            // Victory text with bloom
-            this.ctx.font = 'bold 52px Quicksand, Segoe UI';
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-
-            // Outer glow layer
-            this.ctx.shadowBlur = 30;
-            this.ctx.shadowColor = 'rgba(255, 215, 100, 0.8)';
-            this.ctx.fillStyle = 'rgba(255, 240, 200, 0.3)';
-            this.ctx.fillText('FLOCK HERDED!', this.canvas.width / 2, this.canvas.height / 2);
-
-            // Inner glow layer
-            this.ctx.shadowBlur = 15;
-            this.ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
-            this.ctx.fillStyle = '#FFF5D0';
-            this.ctx.fillText('FLOCK HERDED!', this.canvas.width / 2, this.canvas.height / 2);
-
-            // Burst of extra particles on victory
-            for (let i = 0; i < 3; i++) {
-                const p = this.createParticle();
-                p.x = this.canvas.width / 2 + (Math.random() - 0.5) * 200;
-                p.y = this.canvas.height / 2 + (Math.random() - 0.5) * 100;
-                p.alpha = 0.5 + Math.random() * 0.3;
-                p.size = 2 + Math.random() * 3;
-                this.particles.push(p);
-            }
-            // Cap particles to prevent unbounded growth
-            if (this.particles.length > 100) {
-                this.particles.splice(0, this.particles.length - 100);
-            }
-
-            this.ctx.restore();
-        }
-    }
-
-    private updateHUD(dogs: Dog[]): void {
-        for (const dog of dogs) {
-            const hudId = `dog-${dog.id}`;
-            const element = this.hudItems[hudId];
-            if (element) {
-                if (dog.selected) {
-                    element.classList.add('selected');
-                } else {
-                    element.classList.remove('selected');
-                }
-
-                const state = dog.destination ? 'Moving' : 'Idle';
-                element.innerHTML = `${dog.name} (${dog.key.toUpperCase()}) <br/> <small>${state}</small>`;
-                element.style.color = dog.color;
-            }
-        }
     }
 }

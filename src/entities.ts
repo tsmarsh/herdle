@@ -1,4 +1,5 @@
 import Vector from './vector.js';
+import { DogPersonality } from './config.js';
 
 export class Entity {
     public pos: Vector;
@@ -69,10 +70,13 @@ export class Pen {
 export class Dog extends Entity {
     public destination: Vector | null = null;
     public selected: boolean = false;
+    public personality: DogPersonality;
+    private wanderAngle: number = Math.random() * Math.PI * 2;
 
-    constructor(public id: string, public name: string, public key: string, color: string, x: number, y: number) {
+    constructor(public id: string, public name: string, public key: string, color: string, x: number, y: number, personality: DogPersonality) {
         super(x, y, 12, color);
-        this.maxSpeed = 300;
+        this.personality = personality;
+        this.maxSpeed = 300 * personality.speed;
     }
 
     setDestination(x: number, y: number): void {
@@ -85,21 +89,33 @@ export class Dog extends Entity {
 
     updateDog(dt: number, obstacles: Obstacle[], canvasWidth: number, canvasHeight: number): void {
         super.update(dt);
-        
+
+        const arrivalThreshold = 5 + (1 - this.personality.obedience) * 20;
+        const steerCap = this.maxForce * 2 * this.personality.obedience;
+
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
             const d = desired.mag();
-            
-            if (d < 5) {
+
+            if (d < arrivalThreshold) {
                 this.destination = null;
                 this.vel = new Vector(0, 0);
             } else {
                 const speed = Math.min(this.maxSpeed, d * 5);
                 const steer = desired.normalize().mul(speed).sub(this.vel);
-                this.applyForce(steer.limit(this.maxForce * 2));
+                this.applyForce(steer.limit(steerCap));
+
+                if (this.personality.distractibility > 0) {
+                    this.wanderAngle += (Math.random() - 0.5) * 0.3;
+                    const wanderForce = new Vector(
+                        Math.cos(this.wanderAngle),
+                        Math.sin(this.wanderAngle)
+                    ).mul(this.maxForce * this.personality.distractibility * 3);
+                    this.applyForce(wanderForce);
+                }
             }
         }
-        
+
         for (const obs of obstacles) {
             const dist = this.pos.dist(obs.pos);
             const combinedRadius = this.radius + obs.radius;
@@ -108,7 +124,7 @@ export class Dog extends Entity {
                 this.pos = obs.pos.add(diff);
             }
         }
-        
+
         this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
         this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
     }
@@ -128,10 +144,12 @@ export class Sheep extends Entity {
     public warnRadius: number = 150;
     private wanderAngle: number = Math.random() * Math.PI * 2;
 
-    constructor(x: number, y: number) {
+    constructor(x: number, y: number, panicRadius: number = 60, warnRadius: number = 150) {
         super(x, y, 8, 'white');
         this.maxSpeed = 300;
         this.maxForce = 8;
+        this.panicRadius = panicRadius;
+        this.warnRadius = warnRadius;
     }
 
     updateSheep(dt: number, dogs: Dog[], others: Sheep[], obstacles: Obstacle[], pen: Pen, canvasWidth: number, canvasHeight: number): void {

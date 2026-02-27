@@ -69,12 +69,15 @@ export class Dog extends Entity {
     key;
     destination = null;
     selected = false;
-    constructor(id, name, key, color, x, y) {
+    personality;
+    wanderAngle = Math.random() * Math.PI * 2;
+    constructor(id, name, key, color, x, y, personality) {
         super(x, y, 12, color);
         this.id = id;
         this.name = name;
         this.key = key;
-        this.maxSpeed = 300;
+        this.personality = personality;
+        this.maxSpeed = 300 * personality.speed;
     }
     setDestination(x, y) {
         if (this.destination) {
@@ -86,17 +89,24 @@ export class Dog extends Entity {
     }
     updateDog(dt, obstacles, canvasWidth, canvasHeight) {
         super.update(dt);
+        const arrivalThreshold = 5 + (1 - this.personality.obedience) * 20;
+        const steerCap = this.maxForce * 2 * this.personality.obedience;
         if (this.destination) {
             const desired = this.destination.sub(this.pos);
             const d = desired.mag();
-            if (d < 5) {
+            if (d < arrivalThreshold) {
                 this.destination = null;
                 this.vel = new Vector(0, 0);
             }
             else {
                 const speed = Math.min(this.maxSpeed, d * 5);
                 const steer = desired.normalize().mul(speed).sub(this.vel);
-                this.applyForce(steer.limit(this.maxForce * 2));
+                this.applyForce(steer.limit(steerCap));
+                if (this.personality.distractibility > 0) {
+                    this.wanderAngle += (Math.random() - 0.5) * 0.3;
+                    const wanderForce = new Vector(Math.cos(this.wanderAngle), Math.sin(this.wanderAngle)).mul(this.maxForce * this.personality.distractibility * 3);
+                    this.applyForce(wanderForce);
+                }
             }
         }
         for (const obs of obstacles) {
@@ -124,10 +134,12 @@ export class Sheep extends Entity {
     panicRadius = 60;
     warnRadius = 150;
     wanderAngle = Math.random() * Math.PI * 2;
-    constructor(x, y) {
+    constructor(x, y, panicRadius = 60, warnRadius = 150) {
         super(x, y, 8, 'white');
         this.maxSpeed = 300;
         this.maxForce = 8;
+        this.panicRadius = panicRadius;
+        this.warnRadius = warnRadius;
     }
     updateSheep(dt, dogs, others, obstacles, pen, canvasWidth, canvasHeight) {
         this.updateState(dogs, pen);

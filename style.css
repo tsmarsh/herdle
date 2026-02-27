@@ -63,3 +63,205 @@ body {
     pointer-events: none;
     letter-spacing: 0.2px;
 }
+
+/* Config gear button */
+#config-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 10;
+}
+
+#config-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+/* Config overlay */
+#config-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+#config-overlay.hidden {
+    display: none;
+}
+
+/* Config modal */
+#config-modal {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 480px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: white;
+}
+
+#config-modal h2 {
+    margin: 0 0 18px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+#config-modal h3 {
+    margin: 18px 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
+
+/* Dog config cards */
+.dog-configs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.dog-config {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dog-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+.dog-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.dog-config label,
+.game-settings label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.slider-value {
+    font-weight: 700;
+    min-width: 28px;
+    text-align: right;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.dog-config input[type="range"],
+.game-settings input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    outline: none;
+    margin-top: 2px;
+    accent-color: #A8D8B8;
+}
+
+.dog-config input[type="range"]::-webkit-slider-thumb,
+.game-settings input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #A8D8B8;
+    cursor: pointer;
+    border: 2px solid white;
+}
+
+.dog-config input[type="range"]::-moz-range-thumb,
+.game-settings input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #A8D8B8;
+    cursor: pointer;
+    border: 2px solid white;
+}
+
+/* Game settings */
+.game-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Action buttons */
+.config-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.config-actions button {
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#config-reset {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+#config-reset:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#config-apply {
+    background: rgba(168, 216, 184, 0.35);
+    color: white;
+    border-color: rgba(168, 216, 184, 0.5);
+}
+
+#config-apply:hover {
+    background: rgba(168, 216, 184, 0.5);
+}
